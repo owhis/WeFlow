@@ -623,29 +623,41 @@ function ExportPage() {
     const updates: Record<string, SessionMetrics> = {}
     for (const session of pending) {
       loadingMetricsRef.current.add(session.username)
-      updates[session.username] = {}
     }
 
     try {
-      const statsResult = await window.electronAPI.chat.getExportSessionStats(pending.map(session => session.username))
-      if (statsResult.success && statsResult.data) {
-        for (const session of pending) {
-          const raw = statsResult.data[session.username]
-          if (!raw) continue
-          updates[session.username] = {
-            totalMessages: raw.totalMessages,
-            voiceMessages: raw.voiceMessages,
-            imageMessages: raw.imageMessages,
-            videoMessages: raw.videoMessages,
-            emojiMessages: raw.emojiMessages,
-            privateMutualGroups: raw.privateMutualGroups,
-            groupMemberCount: raw.groupMemberCount,
-            groupMyMessages: raw.groupMyMessages,
-            groupActiveSpeakers: raw.groupActiveSpeakers,
-            groupMutualFriends: raw.groupMutualFriends,
-            firstTimestamp: raw.firstTimestamp,
-            lastTimestamp: raw.lastTimestamp
+      const batchSize = 80
+      for (let i = 0; i < pending.length; i += batchSize) {
+        const chunk = pending.slice(i, i + batchSize)
+        const ids = chunk.map(session => session.username)
+
+        try {
+          const statsResult = await window.electronAPI.chat.getExportSessionStats(ids)
+          if (!statsResult.success || !statsResult.data) {
+            console.error('加载会话统计失败:', statsResult.error || '未知错误')
+            continue
           }
+
+          for (const session of chunk) {
+            const raw = statsResult.data[session.username]
+            // 成功响应但无明细时按 0 回填，避免该行反复重试导致滚动抖动。
+            updates[session.username] = {
+              totalMessages: raw?.totalMessages ?? 0,
+              voiceMessages: raw?.voiceMessages ?? 0,
+              imageMessages: raw?.imageMessages ?? 0,
+              videoMessages: raw?.videoMessages ?? 0,
+              emojiMessages: raw?.emojiMessages ?? 0,
+              privateMutualGroups: raw?.privateMutualGroups,
+              groupMemberCount: raw?.groupMemberCount,
+              groupMyMessages: raw?.groupMyMessages,
+              groupActiveSpeakers: raw?.groupActiveSpeakers,
+              groupMutualFriends: raw?.groupMutualFriends,
+              firstTimestamp: raw?.firstTimestamp,
+              lastTimestamp: raw?.lastTimestamp
+            }
+          }
+        } catch (error) {
+          console.error('加载会话统计分批失败:', error)
         }
       }
     } catch (error) {

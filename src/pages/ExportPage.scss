@@ -1163,7 +1163,7 @@
   --contacts-select-col-width: 34px;
   --contacts-message-col-width: 120px;
   --contacts-media-col-width: 72px;
-  --contacts-action-col-width: 160px;
+  --contacts-action-col-width: 140px;
   overflow: hidden;
   border: 1px solid var(--border-color);
   border-radius: 10px;
@@ -3324,7 +3324,7 @@
   .table-wrap {
     --contacts-message-col-width: 104px;
     --contacts-media-col-width: 62px;
-    --contacts-action-col-width: 160px;
+    --contacts-action-col-width: 140px;
   }
 
   .table-wrap .contacts-list-header {

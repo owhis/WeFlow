@@ -2831,28 +2831,22 @@ function ChatPage(props: ChatPageProps) {
         if (gen !== inSessionSearchGenRef.current) return
         const messages = res?.messages || []
 
-        // 查询完整消息信息
+        // 补充联系人信息
         const enriched = await Promise.all(
           messages.map(async (msg: any) => {
-            try {
-              const full = await window.electronAPI.chat.getMessages(sid, 0, 3, msg.createTime, msg.createTime, false)
-              const found: any = full?.messages?.find((m: any) => m.localId === msg.localId)
-              if (found && found.senderUsername) {
-                try {
-                  const contact = await window.electronAPI.chat.getContact(found.senderUsername)
-                  if (contact) {
-                    found.senderDisplayName = contact.remark || contact.nickName || found.senderUsername
-                  }
-                  const avatarData = await window.electronAPI.chat.getContactAvatar(found.senderUsername)
-                  if (avatarData?.avatarUrl) {
-                    found.senderAvatarUrl = avatarData.avatarUrl
-                  }
-                } catch {}
-              }
-              return found || msg
-            } catch {
-              return msg
+            if (msg.senderUsername) {
+              try {
+                const contact = await window.electronAPI.chat.getContact(msg.senderUsername)
+                if (contact) {
+                  msg.senderDisplayName = contact.remark || contact.nickName || msg.senderUsername
+                }
+                const avatarData = await window.electronAPI.chat.getContactAvatar(msg.senderUsername)
+                if (avatarData?.avatarUrl) {
+                  msg.senderAvatarUrl = avatarData.avatarUrl
+                }
+              } catch {}
             }
+            return msg
           })
         )
 

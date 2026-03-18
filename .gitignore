@@ -62,6 +62,7 @@ server/
 chatlab-format.md
 *.bak
 AGENTS.md
+AGENT.md
 .claude/
 CLAUDE.md
 .agents/

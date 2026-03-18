@@ -55,14 +55,8 @@ type DecryptResult = {
   isThumb?: boolean  // 是否是缩略图（没有高清图时返回缩略图）
 }
 
-type HardlinkState = {
-  imageTable?: string
-  dirTable?: string
-}
-
 export class ImageDecryptService {
   private configService = new ConfigService()
-  private hardlinkCache = new Map<string, HardlinkState>()
   private resolvedCache = new Map<string, string>()
   private pending = new Map<string, Promise<DecryptResult>>()
   private readonly defaultV1AesKey = 'cfcd208495d565ef'
@@ -683,45 +677,19 @@ export class ImageDecryptService {
 
   private async resolveHardlinkPath(accountDir: string, md5: string, _sessionId?: string): Promise<string | null> {
     try {
-      const hardlinkPath = this.resolveHardlinkDbPath(accountDir)
-      if (!hardlinkPath) {
-        return null
-      }
-
       const ready = await this.ensureWcdbReady()
       if (!ready) {
         this.logInfo('[ImageDecrypt] hardlink db not ready')
         return null
       }
 
-      const state = await this.getHardlinkState(accountDir, hardlinkPath)
-      if (!state.imageTable) {
-        this.logInfo('[ImageDecrypt] hardlink table missing', { hardlinkPath })
-        return null
-      }
+      const resolveResult = await wcdbService.resolveImageHardlink(md5, accountDir)
+      if (!resolveResult.success || !resolveResult.data) return null
+      const fileName = String(resolveResult.data.file_name || '').trim()
+      const fullPath = String(resolveResult.data.full_path || '').trim()
+      if (!fileName) return null
 
-      const escapedMd5 = this.escapeSqlString(md5)
-      const rowResult = await wcdbService.execQuery(
-        'media',
-        hardlinkPath,
-        `SELECT dir1, dir2, file_name FROM ${state.imageTable} WHERE lower(md5) = lower('${escapedMd5}') LIMIT 1`
-      )
-      const row = rowResult.success && rowResult.rows ? rowResult.rows[0] : null
-
-      if (!row) {
-        this.logInfo('[ImageDecrypt] hardlink row miss', { md5, table: state.imageTable })
-        return null
-      }
-
-      const dir1 = this.getRowValue(row, 'dir1')
-      const dir2 = this.getRowValue(row, 'dir2')
-      const fileName = this.getRowValue(row, 'file_name') ?? this.getRowValue(row, 'fileName')
-      if (dir1 === undefined || dir2 === undefined || !fileName) {
-        this.logInfo('[ImageDecrypt] hardlink row incomplete', { row })
-        return null
-      }
-
-      const lowerFileName = fileName.toLowerCase()
+      const lowerFileName = String(fileName).toLowerCase()
       if (lowerFileName.endsWith('.dat')) {
         const baseLower = lowerFileName.slice(0, -4)
         if (!this.isLikelyImageDatBase(baseLower) && !this.looksLikeMd5(baseLower)) {
@@ -730,91 +698,16 @@ export class ImageDecryptService {
         }
       }
 
-      // dir1 和 dir2 是 rowid，需要从 dir2id 表查询对应的目录名
-      let dir1Name: string | null = null
-      let dir2Name: string | null = null
-
-      if (state.dirTable) {
-        try {
-          // 通过 rowid 查询目录名
-          const dir1Result = await wcdbService.execQuery(
-            'media',
-            hardlinkPath,
-            `SELECT username FROM ${state.dirTable} WHERE rowid = ${Number(dir1)} LIMIT 1`
-          )
-          if (dir1Result.success && dir1Result.rows && dir1Result.rows.length > 0) {
-            const value = this.getRowValue(dir1Result.rows[0], 'username')
-            if (value) dir1Name = String(value)
-          }
-
-          const dir2Result = await wcdbService.execQuery(
-            'media',
-            hardlinkPath,
-            `SELECT username FROM ${state.dirTable} WHERE rowid = ${Number(dir2)} LIMIT 1`
-          )
-          if (dir2Result.success && dir2Result.rows && dir2Result.rows.length > 0) {
-            const value = this.getRowValue(dir2Result.rows[0], 'username')
-            if (value) dir2Name = String(value)
-          }
-        } catch {
-          // ignore
-        }
+      if (fullPath && existsSync(fullPath)) {
+        this.logInfo('[ImageDecrypt] hardlink path hit', { fullPath })
+        return fullPath
       }
-
-      if (!dir1Name || !dir2Name) {
-        this.logInfo('[ImageDecrypt] hardlink dir resolve miss', { dir1, dir2, dir1Name, dir2Name })
-        return null
-      }
-
-      // 构建路径: msg/attach/{dir1Name}/{dir2Name}/Img/{fileName}
-      const possiblePaths = [
-        join(accountDir, 'msg', 'attach', dir1Name, dir2Name, 'Img', fileName),
-        join(accountDir, 'msg', 'attach', dir1Name, dir2Name, 'mg', fileName),
-        join(accountDir, 'msg', 'attach', dir1Name, dir2Name, fileName),
-      ]
-
-      for (const fullPath of possiblePaths) {
-        if (existsSync(fullPath)) {
-          this.logInfo('[ImageDecrypt] hardlink path hit', { fullPath })
-          return fullPath
-        }
-      }
-
-      this.logInfo('[ImageDecrypt] hardlink path miss', { possiblePaths })
+      this.logInfo('[ImageDecrypt] hardlink path miss', { fullPath, md5 })
       return null
     } catch {
       // ignore
     }
     return null
-  }
-
-  private async getHardlinkState(accountDir: string, hardlinkPath: string): Promise<HardlinkState> {
-    const cached = this.hardlinkCache.get(hardlinkPath)
-    if (cached) return cached
-
-    const imageResult = await wcdbService.execQuery(
-      'media',
-      hardlinkPath,
-      "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'image_hardlink_info%' ORDER BY name DESC LIMIT 1"
-    )
-    const dirResult = await wcdbService.execQuery(
-      'media',
-      hardlinkPath,
-      "SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'dir2id%' LIMIT 1"
-    )
-    const imageTable = imageResult.success && imageResult.rows && imageResult.rows.length > 0
-      ? this.getRowValue(imageResult.rows[0], 'name')
-      : undefined
-    const dirTable = dirResult.success && dirResult.rows && dirResult.rows.length > 0
-      ? this.getRowValue(dirResult.rows[0], 'name')
-      : undefined
-    const state: HardlinkState = {
-      imageTable: imageTable ? String(imageTable) : undefined,
-      dirTable: dirTable ? String(dirTable) : undefined
-    }
-    this.logInfo('[ImageDecrypt] hardlink state', { hardlinkPath, imageTable: state.imageTable, dirTable: state.dirTable })
-    this.hardlinkCache.set(hardlinkPath, state)
-    return state
   }
 
   private async ensureWcdbReady(): Promise<boolean> {
@@ -1992,7 +1885,6 @@ export class ImageDecryptService {
 
   async clearCache(): Promise<{ success: boolean; error?: string }> {
     this.resolvedCache.clear()
-    this.hardlinkCache.clear()
     this.pending.clear()
     this.updateFlags.clear()
     this.cacheIndexed = false

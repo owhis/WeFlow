@@ -1443,7 +1443,7 @@ function ChatPage(props: ChatPageProps) {
         window.electronAPI.chat.getSessionDetailExtra(normalizedSessionId),
         window.electronAPI.chat.getExportSessionStats(
           [normalizedSessionId],
-          { includeRelations: false, forceRefresh: true, preferAccurateSpecialTypes: true }
+          { includeRelations: false, allowStaleCache: true, cacheOnly: true }
         )
       ])
 
@@ -1476,6 +1476,7 @@ function ChatPage(props: ChatPageProps) {
       }
 
       let refreshIncludeRelations = false
+      let shouldRefreshStatsInBackground = false
       if (statsResultSettled.status === 'fulfilled' && statsResultSettled.value.success) {
         const metric = statsResultSettled.value.data?.[normalizedSessionId] as SessionExportMetric | undefined
         const cacheMeta = statsResultSettled.value.cache?.[normalizedSessionId] as SessionExportCacheMeta | undefined
@@ -1493,11 +1494,49 @@ function ChatPage(props: ChatPageProps) {
             }
           })
         }
+        shouldRefreshStatsInBackground = !metric || Boolean(cacheMeta?.stale)
+      } else {
+        shouldRefreshStatsInBackground = true
       }
       finishBackgroundTask(taskId, 'completed', {
         detail: '聊天页会话详情统计完成',
         progressText: '已完成'
       })
+
+      if (shouldRefreshStatsInBackground) {
+        setIsRefreshingDetailStats(true)
+        void (async () => {
+          try {
+            const freshResult = await window.electronAPI.chat.getExportSessionStats(
+              [normalizedSessionId],
+              { includeRelations: false, forceRefresh: true }
+            )
+            if (requestSeq !== detailRequestSeqRef.current) return
+            if (freshResult.success && freshResult.data) {
+              const freshMetric = freshResult.data[normalizedSessionId] as SessionExportMetric | undefined
+              const freshMeta = freshResult.cache?.[normalizedSessionId] as SessionExportCacheMeta | undefined
+              if (freshMetric) {
+                applySessionDetailStats(normalizedSessionId, freshMetric, freshMeta, false)
+              } else if (freshMeta) {
+                setSessionDetail((prev) => {
+                  if (!prev || prev.wxid !== normalizedSessionId) return prev
+                  return {
+                    ...prev,
+                    statsUpdatedAt: freshMeta.updatedAt,
+                    statsStale: freshMeta.stale
+                  }
+                })
+              }
+            }
+          } catch (error) {
+            console.error('聊天页后台刷新会话统计失败:', error)
+          } finally {
+            if (requestSeq === detailRequestSeqRef.current) {
+              setIsRefreshingDetailStats(false)
+            }
+          }
+        })()
+      }
     } catch (e) {
       console.error('加载会话详情补充统计失败:', e)
       finishBackgroundTask(taskId, 'failed', {
@@ -5778,12 +5817,13 @@ function ChatPage(props: ChatPageProps) {
             // 下载完成后，触发页面刷新让组件重新尝试转写
             // 通过更新缓存触发组件重新检查
             if (pendingVoiceTranscriptRequest) {
-              // 清除缓存中的请求标记，让组件可以重新尝试
-              const cacheKey = `voice-transcript:${pendingVoiceTranscriptRequest.messageId}`
               // 不直接调用转写，而是让组件自己重试
               // 通过触发一个自定义事件来通知所有 MessageBubble 组件
               window.dispatchEvent(new CustomEvent('model-downloaded', {
-                detail: { messageId: pendingVoiceTranscriptRequest.messageId }
+                detail: {
+                  sessionId: pendingVoiceTranscriptRequest.sessionId,
+                  messageId: pendingVoiceTranscriptRequest.messageId
+                }
               }))
             }
             setPendingVoiceTranscriptRequest(null)
@@ -6298,6 +6338,20 @@ const voiceTranscriptCache = new Map<string, string>()
 const senderAvatarCache = new Map<string, { avatarUrl?: string; displayName?: string }>()
 const senderAvatarLoading = new Map<string, Promise<{ avatarUrl?: string; displayName?: string } | null>>()
 
+const buildVoiceCacheIdentity = (
+  sessionId: string,
+  message: Pick<Message, 'localId' | 'createTime' | 'serverId'>
+): string => {
+  const normalizedSessionId = String(sessionId || '').trim()
+  const localId = Math.max(0, Math.floor(Number(message?.localId || 0)))
+  const createTime = Math.max(0, Math.floor(Number(message?.createTime || 0)))
+  const serverIdRaw = String(message?.serverId ?? '').trim()
+  const serverId = /^\d+$/.test(serverIdRaw)
+    ? serverIdRaw.replace(/^0+(?=\d)/, '')
+    : String(Math.max(0, Math.floor(Number(serverIdRaw || 0))))
+  return `${normalizedSessionId}:${localId}:${createTime}:${serverId || '0'}`
+}
+
 // 引用消息中的动画表情组件
 function QuotedEmoji({ cdnUrl, md5 }: { cdnUrl: string; md5?: string }) {
   const cacheKey = md5 || cdnUrl
@@ -6372,11 +6426,12 @@ function MessageBubble({
   const [imageLocalPath, setImageLocalPath] = useState<string | undefined>(
     () => imageDataUrlCache.get(imageCacheKey)
   )
-  const voiceCacheKey = `voice:${message.localId}`
+  const voiceIdentityKey = buildVoiceCacheIdentity(session.username, message)
+  const voiceCacheKey = `voice:${voiceIdentityKey}`
   const [voiceDataUrl, setVoiceDataUrl] = useState<string | undefined>(
     () => voiceDataUrlCache.get(voiceCacheKey)
   )
-  const voiceTranscriptCacheKey = `voice-transcript:${message.localId}`
+  const voiceTranscriptCacheKey = `voice-transcript:${voiceIdentityKey}`
   const [voiceTranscript, setVoiceTranscript] = useState<string | undefined>(
     () => voiceTranscriptCache.get(voiceTranscriptCacheKey)
   )
@@ -6938,14 +6993,16 @@ function MessageBubble({
   // 监听流式转写结果
   useEffect(() => {
     if (!isVoice) return
-    const removeListener = window.electronAPI.chat.onVoiceTranscriptPartial?.((payload: { msgId: string; text: string }) => {
-      if (payload.msgId === String(message.localId)) {
-        setVoiceTranscript(payload.text)
-        voiceTranscriptCache.set(voiceTranscriptCacheKey, payload.text)
-      }
+    const removeListener = window.electronAPI.chat.onVoiceTranscriptPartial?.((payload: { sessionId?: string; msgId: string; createTime?: number; text: string }) => {
+      const sameSession = !payload.sessionId || payload.sessionId === session.username
+      const sameMsgId = payload.msgId === String(message.localId)
+      const sameCreateTime = payload.createTime == null || Number(payload.createTime) === Number(message.createTime || 0)
+      if (!sameSession || !sameMsgId || !sameCreateTime) return
+      setVoiceTranscript(payload.text)
+      voiceTranscriptCache.set(voiceTranscriptCacheKey, payload.text)
     })
     return () => removeListener?.()
-  }, [isVoice, message.localId, voiceTranscriptCacheKey])
+  }, [isVoice, message.createTime, message.localId, session.username, voiceTranscriptCacheKey])
 
   const requestVoiceTranscript = useCallback(async () => {
     if (voiceTranscriptLoading || voiceTranscriptRequestedRef.current) return
@@ -6999,14 +7056,17 @@ function MessageBubble({
     } finally {
       setVoiceTranscriptLoading(false)
     }
-  }, [message.localId, session.username, voiceTranscriptCacheKey, voiceTranscriptLoading, onRequireModelDownload])
+  }, [message.createTime, message.localId, session.username, voiceTranscriptCacheKey, voiceTranscriptLoading, onRequireModelDownload])
 
   // 监听模型下载完成事件
   useEffect(() => {
     if (!isVoice) return
 
     const handleModelDownloaded = (event: CustomEvent) => {
-      if (event.detail?.messageId === String(message.localId)) {
+      if (
+        event.detail?.messageId === String(message.localId) &&
+        (!event.detail?.sessionId || event.detail?.sessionId === session.username)
+      ) {
         // 重置状态，允许重新尝试转写
         voiceTranscriptRequestedRef.current = false
         setVoiceTranscriptError(false)
@@ -7019,7 +7079,7 @@ function MessageBubble({
     return () => {
       window.removeEventListener('model-downloaded', handleModelDownloaded as EventListener)
     }
-  }, [isVoice, message.localId, requestVoiceTranscript])
+  }, [isVoice, message.localId, requestVoiceTranscript, session.username])
 
   // 视频懒加载
   const videoAutoLoadTriggered = useRef(false)

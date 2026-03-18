@@ -319,8 +319,7 @@ export interface ElectronAPI {
     getMessageDateCounts: (sessionId: string) => Promise<{ success: boolean; counts?: Record<string, number>; error?: string }>
     resolveVoiceCache: (sessionId: string, msgId: string) => Promise<{ success: boolean; hasCache: boolean; data?: string }>
     getVoiceTranscript: (sessionId: string, msgId: string, createTime?: number) => Promise<{ success: boolean; transcript?: string; error?: string }>
-    onVoiceTranscriptPartial: (callback: (payload: { msgId: string; text: string }) => void) => () => void
-    execQuery: (kind: string, path: string | null, sql: string) => Promise<{ success: boolean; rows?: any[]; error?: string }>
+    onVoiceTranscriptPartial: (callback: (payload: { sessionId?: string; msgId: string; createTime?: number; text: string }) => void) => () => void
     getMessage: (sessionId: string, localId: number) => Promise<{ success: boolean; message?: Message; error?: string }>
     onWcdbChange: (callback: (event: any, data: { type: string; json: string }) => void) => () => void
   }
@@ -862,6 +861,10 @@ export interface ExportProgress {
   phaseProgress?: number
   phaseTotal?: number
   phaseLabel?: string
+  collectedMessages?: number
+  exportedMessages?: number
+  estimatedTotalMessages?: number
+  writtenFiles?: number
 }
 
 export interface WxidInfo {

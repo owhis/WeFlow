@@ -5,47 +5,6 @@ import { tmpdir } from 'os'
 // DLL 初始化错误信息，用于帮助用户诊断问题
 let lastDllInitError: string | null = null
 
-/**
- * 解析 extra_buffer（protobuf）中的免打扰状态
- * - field 12 (tag 0x60): 值非0 = 免打扰
- * 折叠状态通过 contact.flag & 0x10000000 判断
- */
-function parseExtraBuffer(raw: Buffer | string | null | undefined): { isMuted: boolean } {
-  if (!raw) return { isMuted: false }
-  // execQuery 返回的 BLOB 列是十六进制字符串，需要先解码
-  const buf: Buffer = typeof raw === 'string' ? Buffer.from(raw, 'hex') : raw
-  if (buf.length === 0) return { isMuted: false }
-  let isMuted = false
-  let i = 0
-  const len = buf.length
-
-  const readVarint = (): number => {
-    let result = 0, shift = 0
-    while (i < len) {
-      const b = buf[i++]
-      result |= (b & 0x7f) << shift
-      shift += 7
-      if (!(b & 0x80)) break
-    }
-    return result
-  }
-
-  while (i < len) {
-    const tag = readVarint()
-    const fieldNum = tag >>> 3
-    const wireType = tag & 0x07
-    if (wireType === 0) {
-      const val = readVarint()
-      if (fieldNum === 12 && val !== 0) isMuted = true
-    } else if (wireType === 2) {
-      const sz = readVarint()
-      i += sz
-    } else if (wireType === 5) { i += 4
-    } else if (wireType === 1) { i += 8
-    } else { break }
-  }
-  return { isMuted }
-}
 export function getLastDllInitError(): string | null {
   return lastDllInitError
 }
@@ -86,6 +45,11 @@ export class WcdbCore {
   private wcdbGetMessageMeta: any = null
   private wcdbGetContact: any = null
   private wcdbGetContactStatus: any = null
+  private wcdbGetContactTypeCounts: any = null
+  private wcdbGetContactsCompact: any = null
+  private wcdbGetContactAliasMap: any = null
+  private wcdbGetContactFriendFlags: any = null
+  private wcdbGetChatRoomExtBuffer: any = null
   private wcdbGetMessageTableStats: any = null
   private wcdbGetAggregateStats: any = null
   private wcdbGetAvailableYears: any = null
@@ -106,9 +70,24 @@ export class WcdbCore {
   private wcdbGetEmoticonCdnUrl: any = null
   private wcdbGetDbStatus: any = null
   private wcdbGetVoiceData: any = null
+  private wcdbGetVoiceDataBatch: any = null
+  private wcdbGetMediaSchemaSummary: any = null
+  private wcdbGetSessionMessageCounts: any = null
+  private wcdbGetSessionMessageTypeStats: any = null
+  private wcdbGetSessionMessageTypeStatsBatch: any = null
+  private wcdbGetSessionMessageDateCounts: any = null
+  private wcdbGetSessionMessageDateCountsBatch: any = null
+  private wcdbGetMessagesByType: any = null
+  private wcdbGetHeadImageBuffers: any = null
   private wcdbSearchMessages: any = null
   private wcdbGetSnsTimeline: any = null
   private wcdbGetSnsAnnualStats: any = null
+  private wcdbGetSnsUsernames: any = null
+  private wcdbGetSnsExportStats: any = null
+  private wcdbGetMessageTableColumns: any = null
+  private wcdbGetMessageTableTimeRange: any = null
+  private wcdbResolveImageHardlink: any = null
+  private wcdbResolveVideoHardlinkMd5: any = null
   private wcdbInstallSnsBlockDeleteTrigger: any = null
   private wcdbUninstallSnsBlockDeleteTrigger: any = null
   private wcdbCheckSnsBlockDeleteTrigger: any = null
@@ -719,6 +698,32 @@ export class WcdbCore {
         this.wcdbGetContactStatus = null
       }
 
+      try {
+        this.wcdbGetContactTypeCounts = this.lib.func('int32 wcdb_get_contact_type_counts(int64 handle, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetContactTypeCounts = null
+      }
+      try {
+        this.wcdbGetContactsCompact = this.lib.func('int32 wcdb_get_contacts_compact(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetContactsCompact = null
+      }
+      try {
+        this.wcdbGetContactAliasMap = this.lib.func('int32 wcdb_get_contact_alias_map(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetContactAliasMap = null
+      }
+      try {
+        this.wcdbGetContactFriendFlags = this.lib.func('int32 wcdb_get_contact_friend_flags(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetContactFriendFlags = null
+      }
+      try {
+        this.wcdbGetChatRoomExtBuffer = this.lib.func('int32 wcdb_get_chat_room_ext_buffer(int64 handle, const char* chatroomId, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetChatRoomExtBuffer = null
+      }
+
       // wcdb_status wcdb_get_message_table_stats(wcdb_handle handle, const char* session_id, char** out_json)
       this.wcdbGetMessageTableStats = this.lib.func('int32 wcdb_get_message_table_stats(int64 handle, const char* sessionId, _Out_ void** outJson)')
 
@@ -821,6 +826,51 @@ export class WcdbCore {
       } catch {
         this.wcdbGetVoiceData = null
       }
+      try {
+        this.wcdbGetVoiceDataBatch = this.lib.func('int32 wcdb_get_voice_data_batch(int64 handle, const char* requestsJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetVoiceDataBatch = null
+      }
+      try {
+        this.wcdbGetMediaSchemaSummary = this.lib.func('int32 wcdb_get_media_schema_summary(int64 handle, const char* dbPath, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetMediaSchemaSummary = null
+      }
+      try {
+        this.wcdbGetSessionMessageCounts = this.lib.func('int32 wcdb_get_session_message_counts(int64 handle, const char* sessionIdsJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSessionMessageCounts = null
+      }
+      try {
+        this.wcdbGetSessionMessageTypeStats = this.lib.func('int32 wcdb_get_session_message_type_stats(int64 handle, const char* sessionId, int32 beginTimestamp, int32 endTimestamp, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSessionMessageTypeStats = null
+      }
+      try {
+        this.wcdbGetSessionMessageTypeStatsBatch = this.lib.func('int32 wcdb_get_session_message_type_stats_batch(int64 handle, const char* sessionIdsJson, const char* optionsJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSessionMessageTypeStatsBatch = null
+      }
+      try {
+        this.wcdbGetSessionMessageDateCounts = this.lib.func('int32 wcdb_get_session_message_date_counts(int64 handle, const char* sessionId, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSessionMessageDateCounts = null
+      }
+      try {
+        this.wcdbGetSessionMessageDateCountsBatch = this.lib.func('int32 wcdb_get_session_message_date_counts_batch(int64 handle, const char* sessionIdsJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSessionMessageDateCountsBatch = null
+      }
+      try {
+        this.wcdbGetMessagesByType = this.lib.func('int32 wcdb_get_messages_by_type(int64 handle, const char* sessionId, int64 localType, int32 ascending, int32 limit, int32 offset, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetMessagesByType = null
+      }
+      try {
+        this.wcdbGetHeadImageBuffers = this.lib.func('int32 wcdb_get_head_image_buffers(int64 handle, const char* usernamesJson, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetHeadImageBuffers = null
+      }
 
       // wcdb_status wcdb_search_messages(wcdb_handle handle, const char* session_id, const char* keyword, int32_t limit, int32_t offset, int32_t begin_timestamp, int32_t end_timestamp, char** out_json)
       try {
@@ -841,6 +891,36 @@ export class WcdbCore {
         this.wcdbGetSnsAnnualStats = this.lib.func('int32 wcdb_get_sns_annual_stats(int64 handle, int32 begin, int32 end, _Out_ void** outJson)')
       } catch {
         this.wcdbGetSnsAnnualStats = null
+      }
+      try {
+        this.wcdbGetSnsUsernames = this.lib.func('int32 wcdb_get_sns_usernames(int64 handle, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSnsUsernames = null
+      }
+      try {
+        this.wcdbGetSnsExportStats = this.lib.func('int32 wcdb_get_sns_export_stats(int64 handle, const char* myWxid, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetSnsExportStats = null
+      }
+      try {
+        this.wcdbGetMessageTableColumns = this.lib.func('int32 wcdb_get_message_table_columns(int64 handle, const char* dbPath, const char* tableName, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetMessageTableColumns = null
+      }
+      try {
+        this.wcdbGetMessageTableTimeRange = this.lib.func('int32 wcdb_get_message_table_time_range(int64 handle, const char* dbPath, const char* tableName, _Out_ void** outJson)')
+      } catch {
+        this.wcdbGetMessageTableTimeRange = null
+      }
+      try {
+        this.wcdbResolveImageHardlink = this.lib.func('int32 wcdb_resolve_image_hardlink(int64 handle, const char* md5, const char* accountDir, _Out_ void** outJson)')
+      } catch {
+        this.wcdbResolveImageHardlink = null
+      }
+      try {
+        this.wcdbResolveVideoHardlinkMd5 = this.lib.func('int32 wcdb_resolve_video_hardlink_md5(int64 handle, const char* md5, const char* dbPath, _Out_ void** outJson)')
+      } catch {
+        this.wcdbResolveVideoHardlinkMd5 = null
       }
 
       // wcdb_status wcdb_install_sns_block_delete_trigger(wcdb_handle handle, char** out_error)
@@ -1392,6 +1472,197 @@ export class WcdbCore {
     }
   }
 
+  async getSessionMessageCounts(sessionIds: string[]): Promise<{ success: boolean; counts?: Record<string, number>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetSessionMessageCounts) return this.getMessageCounts(sessionIds)
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSessionMessageCounts(this.handle, JSON.stringify(sessionIds || []), outPtr)
+      if (result !== 0 || !outPtr[0]) {
+        return { success: false, error: `获取会话消息总数失败: ${result}` }
+      }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析会话消息总数失败' }
+      const raw = JSON.parse(jsonStr) || {}
+      const counts: Record<string, number> = {}
+      for (const sid of sessionIds || []) {
+        const value = Number(raw?.[sid] ?? 0)
+        counts[sid] = Number.isFinite(value) ? Math.max(0, Math.floor(value)) : 0
+      }
+      return { success: true, counts }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSessionMessageTypeStats(
+    sessionId: string,
+    beginTimestamp: number = 0,
+    endTimestamp: number = 0
+  ): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetSessionMessageTypeStats) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSessionMessageTypeStats(
+        this.handle,
+        sessionId,
+        this.normalizeTimestamp(beginTimestamp),
+        this.normalizeTimestamp(endTimestamp),
+        outPtr
+      )
+      if (result !== 0 || !outPtr[0]) {
+        return { success: false, error: `获取会话类型统计失败: ${result}` }
+      }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析会话类型统计失败' }
+      return { success: true, data: JSON.parse(jsonStr) || {} }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSessionMessageTypeStatsBatch(
+    sessionIds: string[],
+    options?: {
+      beginTimestamp?: number
+      endTimestamp?: number
+      quickMode?: boolean
+      includeGroupSenderCount?: boolean
+    }
+  ): Promise<{ success: boolean; data?: Record<string, any>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    const normalizedSessionIds = Array.from(new Set((sessionIds || []).map((id) => String(id || '').trim()).filter(Boolean)))
+    if (normalizedSessionIds.length === 0) return { success: true, data: {} }
+
+    if (!this.wcdbGetSessionMessageTypeStatsBatch) {
+      const data: Record<string, any> = {}
+      for (const sessionId of normalizedSessionIds) {
+        const single = await this.getSessionMessageTypeStats(
+          sessionId,
+          options?.beginTimestamp || 0,
+          options?.endTimestamp || 0
+        )
+        if (single.success) {
+          data[sessionId] = single.data || {}
+        }
+      }
+      return { success: true, data }
+    }
+
+    try {
+      const outPtr = [null as any]
+      const optionsJson = JSON.stringify({
+        begin: this.normalizeTimestamp(options?.beginTimestamp || 0),
+        end: this.normalizeTimestamp(options?.endTimestamp || 0),
+        quick_mode: options?.quickMode === true,
+        include_group_sender_count: options?.includeGroupSenderCount !== false
+      })
+      const result = this.wcdbGetSessionMessageTypeStatsBatch(
+        this.handle,
+        JSON.stringify(normalizedSessionIds),
+        optionsJson,
+        outPtr
+      )
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `批量获取会话类型统计失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析批量会话类型统计失败' }
+      return { success: true, data: JSON.parse(jsonStr) || {} }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSessionMessageDateCounts(sessionId: string): Promise<{ success: boolean; counts?: Record<string, number>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetSessionMessageDateCounts) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSessionMessageDateCounts(this.handle, sessionId, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取会话日消息统计失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析会话日消息统计失败' }
+      const raw = JSON.parse(jsonStr) || {}
+      const counts: Record<string, number> = {}
+      for (const [dateKey, value] of Object.entries(raw)) {
+        const count = Number(value)
+        if (!dateKey || !Number.isFinite(count) || count <= 0) continue
+        counts[String(dateKey)] = Math.floor(count)
+      }
+      return { success: true, counts }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSessionMessageDateCountsBatch(sessionIds: string[]): Promise<{ success: boolean; data?: Record<string, Record<string, number>>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    const normalizedSessionIds = Array.from(new Set((sessionIds || []).map((id) => String(id || '').trim()).filter(Boolean)))
+    if (normalizedSessionIds.length === 0) return { success: true, data: {} }
+
+    if (!this.wcdbGetSessionMessageDateCountsBatch) {
+      const data: Record<string, Record<string, number>> = {}
+      for (const sessionId of normalizedSessionIds) {
+        const single = await this.getSessionMessageDateCounts(sessionId)
+        data[sessionId] = single.success && single.counts ? single.counts : {}
+      }
+      return { success: true, data }
+    }
+
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSessionMessageDateCountsBatch(this.handle, JSON.stringify(normalizedSessionIds), outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `批量获取会话日消息统计失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析批量会话日消息统计失败' }
+      const raw = JSON.parse(jsonStr) || {}
+      const data: Record<string, Record<string, number>> = {}
+      for (const sessionId of normalizedSessionIds) {
+        const source = raw?.[sessionId] || {}
+        const next: Record<string, number> = {}
+        for (const [dateKey, value] of Object.entries(source)) {
+          const count = Number(value)
+          if (!dateKey || !Number.isFinite(count) || count <= 0) continue
+          next[String(dateKey)] = Math.floor(count)
+        }
+        data[sessionId] = next
+      }
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getMessagesByType(
+    sessionId: string,
+    localType: number,
+    ascending = false,
+    limit = 0,
+    offset = 0
+  ): Promise<{ success: boolean; rows?: any[]; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetMessagesByType) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetMessagesByType(
+        this.handle,
+        sessionId,
+        BigInt(localType),
+        ascending ? 1 : 0,
+        Math.max(0, Math.floor(limit || 0)),
+        Math.max(0, Math.floor(offset || 0)),
+        outPtr
+      )
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `按类型读取消息失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析按类型消息失败' }
+      const rows = JSON.parse(jsonStr)
+      return { success: true, rows: Array.isArray(rows) ? rows : [] }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
   async getDisplayNames(usernames: string[]): Promise<{ success: boolean; map?: Record<string, string>; error?: string }> {
     if (!this.ensureReady()) {
       return { success: false, error: 'WCDB 未连接' }
@@ -1766,27 +2037,150 @@ export class WcdbCore {
     if (!this.ensureReady()) {
       return { success: false, error: 'WCDB 未连接' }
     }
+    if (!this.wcdbGetContactStatus) {
+      return { success: false, error: '接口未就绪' }
+    }
     try {
-      // 分批查询，避免 SQL 过长（execQuery 不支持参数绑定，直接拼 SQL）
-      const BATCH = 200
+      const outPtr = [null as any]
+      const code = this.wcdbGetContactStatus(this.handle, JSON.stringify(usernames || []), outPtr)
+      if (code !== 0 || !outPtr[0]) {
+        return { success: false, error: `获取会话状态失败: ${code}` }
+      }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析会话状态失败' }
+
+      const rawMap = JSON.parse(jsonStr) || {}
       const map: Record<string, { isFolded: boolean; isMuted: boolean }> = {}
-      for (let i = 0; i < usernames.length; i += BATCH) {
-        const batch = usernames.slice(i, i + BATCH)
-        const inList = batch.map(u => `'${u.replace(/'/g, "''")}'`).join(',')
-        const sql = `SELECT username, flag, extra_buffer FROM contact WHERE username IN (${inList})`
-        const result = await this.execQuery('contact', null, sql)
-        if (!result.success || !result.rows) continue
-        for (const row of result.rows) {
-          const uname: string = row.username
-          // 折叠：flag bit 28 (0x10000000)
-          const flag = parseInt(row.flag ?? '0', 10)
-          const isFolded = (flag & 0x10000000) !== 0
-          // 免打扰：extra_buffer field 12 非0
-          const { isMuted } = parseExtraBuffer(row.extra_buffer)
-          map[uname] = { isFolded, isMuted }
+      for (const username of usernames || []) {
+        const state = rawMap[username] || {}
+        map[username] = {
+          isFolded: Boolean(state.isFolded),
+          isMuted: Boolean(state.isMuted)
         }
       }
       return { success: true, map }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getMessageTableColumns(dbPath: string, tableName: string): Promise<{ success: boolean; columns?: string[]; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetMessageTableColumns) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetMessageTableColumns(this.handle, dbPath, tableName, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取消息表列失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析消息表列失败' }
+      const columns = JSON.parse(jsonStr)
+      return { success: true, columns: Array.isArray(columns) ? columns.map((c: any) => String(c || '')) : [] }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getMessageTableTimeRange(dbPath: string, tableName: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetMessageTableTimeRange) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetMessageTableTimeRange(this.handle, dbPath, tableName, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取消息表时间范围失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析消息表时间范围失败' }
+      const data = JSON.parse(jsonStr) || {}
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getContactTypeCounts(): Promise<{ success: boolean; counts?: { private: number; group: number; official: number; former_friend: number }; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetContactTypeCounts) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const code = this.wcdbGetContactTypeCounts(this.handle, outPtr)
+      if (code !== 0 || !outPtr[0]) return { success: false, error: `获取联系人分类统计失败: ${code}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析联系人分类统计失败' }
+      const raw = JSON.parse(jsonStr) || {}
+      return {
+        success: true,
+        counts: {
+          private: Number(raw.private || 0),
+          group: Number(raw.group || 0),
+          official: Number(raw.official || 0),
+          former_friend: Number(raw.former_friend || 0)
+        }
+      }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getContactsCompact(usernames: string[] = []): Promise<{ success: boolean; contacts?: any[]; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetContactsCompact) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const payload = Array.isArray(usernames) && usernames.length > 0 ? JSON.stringify(usernames) : null
+      const code = this.wcdbGetContactsCompact(this.handle, payload, outPtr)
+      if (code !== 0 || !outPtr[0]) return { success: false, error: `获取联系人列表失败: ${code}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析联系人列表失败' }
+      const contacts = JSON.parse(jsonStr)
+      return { success: true, contacts: Array.isArray(contacts) ? contacts : [] }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getContactAliasMap(usernames: string[]): Promise<{ success: boolean; map?: Record<string, string>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetContactAliasMap) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const code = this.wcdbGetContactAliasMap(this.handle, JSON.stringify(usernames || []), outPtr)
+      if (code !== 0 || !outPtr[0]) return { success: false, error: `获取联系人 alias 失败: ${code}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析联系人 alias 失败' }
+      const map = JSON.parse(jsonStr)
+      return { success: true, map }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getContactFriendFlags(usernames: string[]): Promise<{ success: boolean; map?: Record<string, boolean>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetContactFriendFlags) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const code = this.wcdbGetContactFriendFlags(this.handle, JSON.stringify(usernames || []), outPtr)
+      if (code !== 0 || !outPtr[0]) return { success: false, error: `获取联系人好友标记失败: ${code}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析联系人好友标记失败' }
+      const map = JSON.parse(jsonStr)
+      return { success: true, map }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getChatRoomExtBuffer(chatroomId: string): Promise<{ success: boolean; extBuffer?: string; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetChatRoomExtBuffer) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const code = this.wcdbGetChatRoomExtBuffer(this.handle, chatroomId, outPtr)
+      if (code !== 0 || !outPtr[0]) return { success: false, error: `获取群聊 ext_buffer 失败: ${code}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析群聊 ext_buffer 失败' }
+      const data = JSON.parse(jsonStr) || {}
+      const extBuffer = String(data.ext_buffer || '').trim()
+      return { success: true, extBuffer: extBuffer || undefined }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -2078,8 +2472,11 @@ export class WcdbCore {
     if (!this.ensureReady()) {
       return { success: false, error: 'WCDB 未连接' }
     }
+    const startedAt = Date.now()
     try {
       if (!this.wcdbExecQuery) return { success: false, error: '接口未就绪' }
+      const fallbackFlag = /fallback|diag|diagnostic/i.test(String(sql || ''))
+      this.writeLog(`[audit:execQuery] kind=${kind} path=${path || ''} sql_len=${String(sql || '').length} fallback=${fallbackFlag ? 1 : 0}`)
       
       // 如果提供了参数，使用参数化查询（需要 C++ 层支持）
       // 注意：当前 wcdbExecQuery 可能不支持参数化，这是一个占位符实现
@@ -2114,12 +2511,14 @@ export class WcdbCore {
       const jsonStr = this.decodeJsonPtr(outPtr[0])
       if (!jsonStr) return { success: false, error: '解析查询结果失败' }
       const rows = JSON.parse(jsonStr)
+      this.writeLog(`[audit:execQuery] done kind=${kind} cost_ms=${Date.now() - startedAt} rows=${Array.isArray(rows) ? rows.length : -1}`)
       if (isContactQuery) {
         const count = Array.isArray(rows) ? rows.length : -1
         this.writeLog(`[diag:execQuery] contact query ok rows=${count} kind=${kind} path=${effectivePath} sql="${this.formatSqlForLog(sql)}"`, true)
       }
       return { success: true, rows }
     } catch (e) {
+      this.writeLog(`[audit:execQuery] fail kind=${kind} cost_ms=${Date.now() - startedAt} err=${String(e)}`)
       const isContactQuery = String(kind).toLowerCase() === 'contact' || /\bfrom\s+contact\b/i.test(String(sql))
       if (isContactQuery) {
         this.writeLog(`[diag:execQuery] contact query exception kind=${kind} path=${path || ''} sql="${this.formatSqlForLog(sql)}" err=${String(e)}`, true)
@@ -2204,6 +2603,93 @@ export class WcdbCore {
       const hex = this.decodeJsonPtr(outPtr[0])
       if (hex === null) return { success: false, error: '解析语音数据失败' }
       return { success: true, hex: hex || undefined }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getVoiceDataBatch(
+    requests: Array<{ session_id: string; create_time: number; local_id?: number; svr_id?: string | number; candidates?: string[] }>
+  ): Promise<{ success: boolean; rows?: Array<{ index: number; hex?: string }>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetVoiceDataBatch) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const payload = JSON.stringify(Array.isArray(requests) ? requests : [])
+      const result = this.wcdbGetVoiceDataBatch(this.handle, payload, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `批量获取语音数据失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析批量语音数据失败' }
+      const rows = JSON.parse(jsonStr)
+      const normalized = Array.isArray(rows) ? rows.map((row: any) => ({
+        index: Number(row?.index ?? 0),
+        hex: row?.hex ? String(row.hex) : undefined
+      })) : []
+      return { success: true, rows: normalized }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getMediaSchemaSummary(dbPath: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetMediaSchemaSummary) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetMediaSchemaSummary(this.handle, dbPath, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取媒体表结构摘要失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析媒体表结构摘要失败' }
+      const data = JSON.parse(jsonStr) || {}
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getHeadImageBuffers(usernames: string[]): Promise<{ success: boolean; map?: Record<string, string>; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetHeadImageBuffers) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetHeadImageBuffers(this.handle, JSON.stringify(usernames || []), outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取头像二进制失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析头像二进制失败' }
+      const map = JSON.parse(jsonStr) || {}
+      return { success: true, map }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async resolveImageHardlink(md5: string, accountDir?: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbResolveImageHardlink) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbResolveImageHardlink(this.handle, md5, accountDir || null, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `解析图片 hardlink 失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析图片 hardlink 响应失败' }
+      const data = JSON.parse(jsonStr) || {}
+      return { success: true, data }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async resolveVideoHardlinkMd5(md5: string, dbPath?: string): Promise<{ success: boolean; data?: any; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbResolveVideoHardlinkMd5) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbResolveVideoHardlinkMd5(this.handle, md5, dbPath || null, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `解析视频 hardlink 失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析视频 hardlink 响应失败' }
+      const data = JSON.parse(jsonStr) || {}
+      return { success: true, data }
     } catch (e) {
       return { success: false, error: String(e) }
     }
@@ -2370,6 +2856,45 @@ export class WcdbCore {
       return { success: true, data: JSON.parse(jsonStr) }
     } catch (e) {
       console.error('getSnsAnnualStats 异常:', e)
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSnsUsernames(): Promise<{ success: boolean; usernames?: string[]; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetSnsUsernames) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSnsUsernames(this.handle, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取朋友圈用户名失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析朋友圈用户名失败' }
+      const usernames = JSON.parse(jsonStr)
+      return { success: true, usernames: Array.isArray(usernames) ? usernames.map((u: any) => String(u || '').trim()).filter(Boolean) : [] }
+    } catch (e) {
+      return { success: false, error: String(e) }
+    }
+  }
+
+  async getSnsExportStats(myWxid?: string): Promise<{ success: boolean; data?: { totalPosts: number; totalFriends: number; myPosts: number | null }; error?: string }> {
+    if (!this.ensureReady()) return { success: false, error: 'WCDB 未连接' }
+    if (!this.wcdbGetSnsExportStats) return { success: false, error: '接口未就绪' }
+    try {
+      const outPtr = [null as any]
+      const result = this.wcdbGetSnsExportStats(this.handle, myWxid || null, outPtr)
+      if (result !== 0 || !outPtr[0]) return { success: false, error: `获取朋友圈导出统计失败: ${result}` }
+      const jsonStr = this.decodeJsonPtr(outPtr[0])
+      if (!jsonStr) return { success: false, error: '解析朋友圈导出统计失败' }
+      const raw = JSON.parse(jsonStr) || {}
+      return {
+        success: true,
+        data: {
+          totalPosts: Number(raw.total_posts || 0),
+          totalFriends: Number(raw.total_friends || 0),
+          myPosts: raw.my_posts === null || raw.my_posts === undefined ? null : Number(raw.my_posts || 0)
+        }
+      }
+    } catch (e) {
       return { success: false, error: String(e) }
     }
   }

@@ -17,7 +17,6 @@ import { annualReportService } from './services/annualReportService'
 import { exportService, ExportOptions, ExportProgress } from './services/exportService'
 import { KeyService } from './services/keyService'
 import { KeyServiceMac } from './services/keyServiceMac'
-import { KeyServiceLinux} from "./services/keyServiceLinux"
 import { voiceTranscribeService } from './services/voiceTranscribeService'
 import { videoService } from './services/videoService'
 import { snsService, isVideoUrl } from './services/snsService'
@@ -96,7 +95,7 @@ let keyService: any
 if (process.platform === 'darwin') {
   keyService = new KeyServiceMac()
 } else if (process.platform === 'linux') {
-   // const { KeyServiceLinux } = require('./services/keyServiceLinux')
+  const { KeyServiceLinux } = require('./services/keyServiceLinux')
   keyService = new KeyServiceLinux()
 } else {
   keyService = new KeyService()
@@ -1629,7 +1628,7 @@ function registerIpcHandlers() {
 
   ipcMain.handle('chat:getVoiceTranscript', async (event, sessionId: string, msgId: string, createTime?: number) => {
     return chatService.getVoiceTranscript(sessionId, msgId, createTime, (text) => {
-      event.sender.send('chat:voiceTranscriptPartial', { msgId, text })
+      event.sender.send('chat:voiceTranscriptPartial', { sessionId, msgId, createTime, text })
     })
   })
 
@@ -1639,10 +1638,6 @@ function registerIpcHandlers() {
 
   ipcMain.handle('chat:searchMessages', async (_, keyword: string, sessionId?: string, limit?: number, offset?: number, beginTimestamp?: number, endTimestamp?: number) => {
     return chatService.searchMessages(keyword, sessionId, limit, offset, beginTimestamp, endTimestamp)
-  })
-
-  ipcMain.handle('chat:execQuery', async (_, kind: string, path: string | null, sql: string) => {
-    return chatService.execQuery(kind, path, sql)
   })
 
   ipcMain.handle('sns:getTimeline', async (_, limit: number, offset: number, usernames?: string[], keyword?: string, startTime?: number, endTime?: number) => {
@@ -1856,7 +1851,83 @@ function registerIpcHandlers() {
       }
     }
 
-    return exportService.exportSessions(sessionIds, outputDir, options, onProgress)
+    const runMainFallback = async (reason: string) => {
+      console.warn(`[fallback-export-main] ${reason}`)
+      return exportService.exportSessions(sessionIds, outputDir, options, onProgress)
+    }
+
+    const cfg = configService || new ConfigService()
+    configService = cfg
+    const logEnabled = cfg.get('logEnabled')
+    const resourcesPath = app.isPackaged
+      ? join(process.resourcesPath, 'resources')
+      : join(app.getAppPath(), 'resources')
+    const userDataPath = app.getPath('userData')
+    const workerPath = join(__dirname, 'exportWorker.js')
+
+    const runWorker = async () => {
+      return await new Promise<any>((resolve, reject) => {
+        const worker = new Worker(workerPath, {
+          workerData: {
+            sessionIds,
+            outputDir,
+            options,
+            resourcesPath,
+            userDataPath,
+            logEnabled
+          }
+        })
+
+        let settled = false
+        const finalizeResolve = (value: any) => {
+          if (settled) return
+          settled = true
+          worker.removeAllListeners()
+          void worker.terminate()
+          resolve(value)
+        }
+        const finalizeReject = (error: Error) => {
+          if (settled) return
+          settled = true
+          worker.removeAllListeners()
+          void worker.terminate()
+          reject(error)
+        }
+
+        worker.on('message', (msg: any) => {
+          if (msg && msg.type === 'export:progress') {
+            onProgress(msg.data as ExportProgress)
+            return
+          }
+          if (msg && msg.type === 'export:result') {
+            finalizeResolve(msg.data)
+            return
+          }
+          if (msg && msg.type === 'export:error') {
+            finalizeReject(new Error(String(msg.error || '导出 Worker 执行失败')))
+          }
+        })
+
+        worker.on('error', (error) => {
+          finalizeReject(error instanceof Error ? error : new Error(String(error)))
+        })
+
+        worker.on('exit', (code) => {
+          if (settled) return
+          if (code === 0) {
+            finalizeResolve({ success: false, successCount: 0, failCount: 0, error: '导出 Worker 未返回结果' })
+          } else {
+            finalizeReject(new Error(`导出 Worker 异常退出: ${code}`))
+          }
+        })
+      })
+    }
+
+    try {
+      return await runWorker()
+    } catch (error) {
+      return runMainFallback(error instanceof Error ? error.message : String(error))
+    }
   })
 
   ipcMain.handle('export:exportSession', async (_, sessionId: string, outputPath: string, options: ExportOptions) => {

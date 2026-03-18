@@ -70,7 +70,7 @@ class VideoService {
 
     /**
      * 从 video_hardlink_info_v4 表查询视频文件名
-     * 使用 wcdbService.execQuery 查询加密的 hardlink.db
+     * 使用 wcdb 专属接口查询加密的 hardlink.db
      */
     private async queryVideoFileName(md5: string): Promise<string | undefined> {
         const dbPath = this.getDbPath()
@@ -103,17 +103,11 @@ class VideoService {
                 if (existsSync(p)) {
                     try {
                         this.log('尝试加密 hardlink.db', { path: p })
-                        const escapedMd5 = md5.replace(/'/g, "''")
-                        const sql = `SELECT file_name FROM video_hardlink_info_v4 WHERE md5 = '${escapedMd5}' LIMIT 1`
-                        const result = await wcdbService.execQuery('media', p, sql)
-
-                        if (result.success && result.rows && result.rows.length > 0) {
-                            const row = result.rows[0]
-                            if (row?.file_name) {
-                                const realMd5 = String(row.file_name).replace(/\.[^.]+$/, '')
-                                this.log('加密 hardlink.db 命中', { file_name: row.file_name, realMd5 })
-                                return realMd5
-                            }
+                        const result = await wcdbService.resolveVideoHardlinkMd5(md5, p)
+                        if (result.success && result.data?.resolved_md5) {
+                            const realMd5 = String(result.data.resolved_md5)
+                            this.log('加密 hardlink.db 命中', { file_name: result.data.file_name, realMd5 })
+                            return realMd5
                         }
                         this.log('加密 hardlink.db 未命中', { path: p, result: JSON.stringify(result).slice(0, 200) })
                     } catch (e) {

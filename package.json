@@ -131,6 +131,10 @@
         "to": "icon.ico"
       },
       {
+        "from": "public/icon.png",
+        "to": "icon.png"
+      },
+      {
         "from": "electron/assets/wasm/",
         "to": "assets/wasm/"
       }

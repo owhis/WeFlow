@@ -64,6 +64,7 @@
   "build": {
     "appId": "com.WeFlow.app",
     "afterPack": "scripts/afterPack-sign-manifest.cjs",
+    "afterSign": "scripts/afterPack-sign-manifest.cjs",
     "publish": {
       "provider": "github",
       "owner": "hicccc77",

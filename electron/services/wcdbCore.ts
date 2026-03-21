@@ -312,6 +312,8 @@ export class WcdbCore {
       case -2208: return '安全校验失败：目标文件哈希读取失败（-2208）'
       case -2209: return '安全校验失败：目标文件哈希不匹配（-2209）'
       case -2210: return '安全校验失败：签名无效（-2210）'
+      case -2211: return '安全校验失败：主程序 EXE 哈希不匹配（-2211）'
+      case -2212: return '安全校验失败：wcdb_api 模块哈希不匹配（-2212）'
       default: return `安全校验失败（错误码: ${code}）`
     }
   }
@@ -655,12 +657,21 @@ export class WcdbCore {
 
         let protectionOk = false
         let protectionCode = -1
+        let bestFailCode: number | null = null
+        const scoreFailCode = (code: number): number => {
+          if (code >= -2212 && code <= -2201) return 0 // manifest/signature/hash failures
+          if (code === -102 || code === -101 || code === -1006) return 1
+          return 2
+        }
         for (const resPath of resourcePaths) {
           try {
             protectionCode = Number(this.wcdbInitProtection(resPath))
             if (protectionCode === 0) {
               protectionOk = true
               break
+            }
+            if (bestFailCode === null || scoreFailCode(protectionCode) < scoreFailCode(bestFailCode)) {
+              bestFailCode = protectionCode
             }
             this.writeLog(`[bootstrap] InitProtection rc=${protectionCode} path=${resPath}`, true)
           } catch (e) {
@@ -669,8 +680,9 @@ export class WcdbCore {
         }
 
         if (!protectionOk) {
-          lastDllInitError = this.formatInitProtectionError(protectionCode)
-          this.writeLog(`[bootstrap] InitProtection failed finalCode=${protectionCode}`, true)
+          const finalCode = bestFailCode ?? protectionCode
+          lastDllInitError = this.formatInitProtectionError(finalCode)
+          this.writeLog(`[bootstrap] InitProtection failed finalCode=${finalCode}`, true)
           return false
         }
       } catch (e) {

@@ -245,5 +245,7 @@ module.exports = async function afterPack(context) {
   console.log(`[wf-sign] manifest: ${manifestPath}`);
   console.log(`[wf-sign] signature: ${signaturePath}`);
   console.log(`[wf-sign] exe: ${manifest.targets[0].path}`);
+  console.log(`[wf-sign] exe.sha256: ${manifest.targets[0].sha256}`);
   console.log(`[wf-sign] module: ${manifest.targets[1].path}`);
+  console.log(`[wf-sign] module.sha256: ${manifest.targets[1].sha256}`);
 };

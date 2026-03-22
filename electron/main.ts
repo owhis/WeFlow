@@ -36,6 +36,10 @@ import { messagePushService } from './services/messagePushService'
 autoUpdater.autoDownload = false
 autoUpdater.autoInstallOnAppQuit = true
 autoUpdater.disableDifferentialDownload = true  // 禁用差分更新，强制全量下载
+// Windows x64 与 arm64 使用不同更新通道，避免 latest.yml 互相覆盖导致下错架构安装包。
+if (process.platform === 'win32' && process.arch === 'arm64') {
+  autoUpdater.channel = 'latest-arm64'
+}
 const AUTO_UPDATE_ENABLED =
   process.env.AUTO_UPDATE_ENABLED === 'true' ||
   process.env.AUTO_UPDATE_ENABLED === '1' ||

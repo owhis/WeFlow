@@ -119,7 +119,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx electron-builder --publish always
+          npx electron-builder --win nsis --x64 --publish always '--config.artifactName=${productName}-${version}-x64-Setup.${ext}'
 
   release-windows-arm64:
     runs-on: windows-latest
@@ -155,7 +155,7 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          npx electron-builder --win nsis --arm64 --publish always '--config.artifactName=${productName}-${version}-arm64-Setup.${ext}'
+          npx electron-builder --win nsis --arm64 --publish always '--config.publish.channel=latest-arm64' '--config.artifactName=${productName}-${version}-arm64-Setup.${ext}'
 
   update-release-notes:
     runs-on: ubuntu-latest
@@ -184,7 +184,10 @@ jobs:
             echo "$ASSETS_JSON" | jq -r --arg p "$pattern" '[.assets[].name | select(test($p))][0] // ""'
           }
 
-          WINDOWS_ASSET="$(echo "$ASSETS_JSON" | jq -r '[.assets[].name | select(test("\\.exe$")) | select(test("arm64") | not)][0] // ""')"
+          WINDOWS_ASSET="$(echo "$ASSETS_JSON" | jq -r '[.assets[].name | select(test("x64.*\\.exe$"))][0] // ""')"
+          if [ -z "$WINDOWS_ASSET" ]; then
+            WINDOWS_ASSET="$(echo "$ASSETS_JSON" | jq -r '[.assets[].name | select(test("\\.exe$")) | select(test("arm64") | not)][0] // ""')"
+          fi
           WINDOWS_ARM64_ASSET="$(echo "$ASSETS_JSON" | jq -r '[.assets[].name | select(test("arm64.*\\.exe$"))][0] // ""')"
           MAC_ASSET="$(pick_asset "\\.dmg$")"
           LINUX_DEB_ASSET="$(pick_asset "\\.deb$")"

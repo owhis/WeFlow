@@ -326,6 +326,11 @@ export interface ElectronAPI {
     getMessage: (sessionId: string, localId: number) => Promise<{ success: boolean; message?: Message; error?: string }>
     onWcdbChange: (callback: (event: any, data: { type: string; json: string }) => void) => () => void
   }
+  biz: {
+    listAccounts: (account?: string) => Promise<any[]>
+    listMessages: (username: string, account?: string, limit?: number, offset?: number) => Promise<any[]>
+    listPayRecords: (account?: string, limit?: number, offset?: number) => Promise<any[]>
+  }
 
   image: {
     decrypt: (payload: { sessionId?: string; imageMd5?: string; imageDatName?: string; force?: boolean }) => Promise<{ success: boolean; localPath?: string; liveVideoPath?: string; error?: string }>

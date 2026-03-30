@@ -413,6 +413,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     downloadEmoji: (params: { url: string; encryptUrl?: string; aesKey?: string }) => ipcRenderer.invoke('sns:downloadEmoji', params)
   },
 
+  biz: {
+    listAccounts: (account?: string) => ipcRenderer.invoke('biz:listAccounts', account),
+    listMessages: (username: string, account?: string, limit?: number, offset?: number) =>
+        ipcRenderer.invoke('biz:listMessages', username, account, limit, offset),
+    listPayRecords: (account?: string, limit?: number, offset?: number) =>
+        ipcRenderer.invoke('biz:listPayRecords', account, limit, offset)
+  },
+
 
   // 数据收集
   cloud: {

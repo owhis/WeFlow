@@ -30,7 +30,7 @@ import { cloudControlService } from './services/cloudControlService'
 import { destroyNotificationWindow, registerNotificationHandlers, showNotification } from './windows/notificationWindow'
 import { httpService } from './services/httpService'
 import { messagePushService } from './services/messagePushService'
-
+import { bizService } from './services/bizService'
 
 // 配置自动更新
 autoUpdater.autoDownload = false
@@ -1110,6 +1110,7 @@ const removeMatchedEntriesInDir = async (
 // 注册 IPC 处理器
 function registerIpcHandlers() {
   registerNotificationHandlers()
+  bizService.registerHandlers()
   // 配置相关
   ipcMain.handle('config:get', async (_, key: string) => {
     return configService?.get(key as any)

@@ -2681,7 +2681,7 @@ export class WcdbCore {
     }
     try {
       const outCursor = [0]
-      const result = this.wcdbOpenMessageCursorLite(
+      let result = this.wcdbOpenMessageCursorLite(
         this.handle,
         sessionId,
         batchSize,
@@ -2690,6 +2690,29 @@ export class WcdbCore {
         endTimestamp,
         outCursor
       )
+
+      // result=-3 表示 WCDB_STATUS_NO_MESSAGE_DB：消息数据库缓存为空
+      // 自动强制重连并重试一次
+      if (result === -3 && outCursor[0] <= 0) {
+        this.writeLog('openMessageCursorLite: result=-3 (no message db), attempting forceReopen...', true)
+        const reopened = await this.forceReopen()
+        if (reopened && this.handle !== null) {
+          outCursor[0] = 0
+          result = this.wcdbOpenMessageCursorLite(
+            this.handle,
+            sessionId,
+            batchSize,
+            ascending ? 1 : 0,
+            beginTimestamp,
+            endTimestamp,
+            outCursor
+          )
+          this.writeLog(`openMessageCursorLite retry after forceReopen: result=${result} cursor=${outCursor[0]}`, true)
+        } else {
+          this.writeLog('openMessageCursorLite forceReopen failed, giving up', true)
+        }
+      }
+
       if (result !== 0 || outCursor[0] <= 0) {
         await this.printLogs(true)
         this.writeLog(

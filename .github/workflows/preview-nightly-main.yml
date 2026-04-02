@@ -92,7 +92,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        shell: bash
         run: |
+          export ELECTRON_BUILDER_BINARIES_MIRROR="https://github.com/electron-userland/electron-builder-binaries/releases/download/"
+          echo "Using ELECTRON_BUILDER_BINARIES_MIRROR=$ELECTRON_BUILDER_BINARIES_MIRROR"
           npx electron-builder --mac dmg --arm64 --publish always '--config.publish.releaseType=prerelease' '--config.publish.channel=preview'
 
   preview-linux:

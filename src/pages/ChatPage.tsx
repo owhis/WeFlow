@@ -986,6 +986,7 @@ const SessionItem = React.memo(function SessionItem({
   )
 
   const isFoldEntry = session.username.toLowerCase().includes('placeholder_foldgroup')
+  const isBizEntry = session.username === OFFICIAL_ACCOUNTS_VIRTUAL_ID
 
   // 折叠入口：专属名称和图标
   if (isFoldEntry) {
@@ -1004,6 +1005,29 @@ const SessionItem = React.memo(function SessionItem({
           </div>
           <div className="session-bottom">
             <span className="session-summary">{session.summary || '暂无消息'}</span>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // 公众号入口：专属名称和图标
+  if (isBizEntry) {
+    return (
+      <div
+        className={`session-item biz-entry ${isActive ? 'active' : ''}`}
+        onClick={() => onSelect(session)}
+      >
+        <div className="biz-entry-avatar">
+          <Newspaper size={22} />
+        </div>
+        <div className="session-info">
+          <div className="session-top">
+            <span className="session-name">订阅号/服务号</span>
+            <span className="session-time">{timeText}</span>
+          </div>
+          <div className="session-bottom">
+            <span className="session-summary">{session.summary || '查看公众号历史消息'}</span>
           </div>
         </div>
       </div>
@@ -4965,29 +4989,25 @@ function ChatPage(props: ChatPageProps) {
       return true
     })
 
-    // 注入“订阅号/服务号”虚拟项
     const bizEntry: ChatSession = {
       username: OFFICIAL_ACCOUNTS_VIRTUAL_ID,
-      displayName: '订阅号/服务号',
+      displayName: '公众号',
       summary: '查看公众号历史消息',
       type: 0,
-      sortTimestamp: 9999999999, // 确保在前面，或者您可以根据需要调整排序
+      sortTimestamp: 9999999999,  // 放到最前面？  目前还没有严格的对时间进行排序，  后面可以改一下
       lastTimestamp: 0,
       lastMsgType: 0,
       unreadCount: 0,
       isMuted: false,
       isFolded: false
     }
-    
-    // 检查是否已经存在（防止重复注入）
+
     if (!visible.some(s => s.username === OFFICIAL_ACCOUNTS_VIRTUAL_ID)) {
-      // 插入到首位或者折叠项之后
       visible.unshift(bizEntry)
     }
 
-    // 如果有折叠的群聊，但列表中没有入口，则插入入口
     if (hasFoldedGroups && !visible.some(s => s.username.toLowerCase().includes('placeholder_foldgroup'))) {
-      // 找到最新的折叠消息
+
       const latestFolded = foldedGroups.reduce((latest, current) => {
         const latestTime = latest.sortTimestamp || latest.lastTimestamp
         const currentTime = current.sortTimestamp || current.lastTimestamp
@@ -6239,7 +6259,7 @@ function ChatPage(props: ChatPageProps) {
                     <SessionItem
                       key={session.username}
                       session={session}
-                      isActive={currentSessionId === session.username}
+                      isActive={currentSessionId === session.username || (bizView && session.username === OFFICIAL_ACCOUNTS_VIRTUAL_ID)}
                       onSelect={handleSelectSession}
                       formatTime={formatSessionTime}
                       searchKeyword={searchKeyword}
@@ -6265,7 +6285,7 @@ function ChatPage(props: ChatPageProps) {
                             <SessionItem
                                 key={session.username}
                                 session={session}
-                                isActive={currentSessionId === session.username}
+                                isActive={currentSessionId === session.username || (bizView && session.username === OFFICIAL_ACCOUNTS_VIRTUAL_ID)}
                                 onSelect={handleSelectSession}
                                 formatTime={formatSessionTime}
                                 searchKeyword={searchKeyword}

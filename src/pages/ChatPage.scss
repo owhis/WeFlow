@@ -4487,6 +4487,32 @@
     font-weight: 500;
   }
 }
+
+// 公众号入口样式
+.session-item.biz-entry {
+  cursor: pointer;
+  transition: background-color 0.2s;
+
+  &:hover {
+    background: var(--hover-bg, rgba(0,0,0,0.05));
+  }
+
+  .biz-entry-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+    background: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    color: #07c160;
+  }
+
+  .session-name {
+    font-weight: 500;
+  }
+}
 // 消息信息弹窗
 .message-info-overlay {
   position: fixed;

@@ -23,7 +23,6 @@ export interface BizMessage {
   url: string
   cover: string
   content_list: any[]
-  raw?: any // 调试用
 }
 
 export interface BizPayRecord {
@@ -69,7 +68,7 @@ export class BizService {
         }
         if (itemStruct.title) contentList.push(itemStruct)
       }
-    } catch (e) {}
+    } catch (e) { }
     return contentList
   }
 
@@ -84,51 +83,6 @@ export class BizService {
       if (!title && !description) return null
       return { title, description, merchant_name: merchantName, merchant_icon: merchantIcon, timestamp: pubTime }
     } catch (e) { return null }
-  }
-
-  /**
-   * 核心：获取公众号消息，支持从 biz_message*.db 自动定位
-   */
-  private async getBizRawMessages(username: string, account: string, limit: number, offset: number): Promise<Message[]> {
-    console.log(`[BizService] getBizRawMessages: ${username}, offset=${offset}, limit=${limit}`)
-    
-    // 1. 首先尝试直接用 chatService.getMessages (如果 Native 层支持路由)
-    const chatRes = await chatService.getMessages(username, offset, limit)
-    if (chatRes.success && chatRes.messages && chatRes.messages.length > 0) {
-      console.log(`[BizService] chatService found ${chatRes.messages.length} messages for ${username}`)
-      return chatRes.messages
-    }
-
-    // 2. 如果 chatService 没找到，手动扫描 biz_message*.db (类似 Python 逻辑)
-    console.log(`[BizService] chatService empty, manual scanning biz_message*.db...`)
-    const root = this.configService.get('dbPath')
-    const accountWxid = account || this.configService.get('myWxid')
-    if (!root || !accountWxid) return []
-
-    const dbDir = join(root, accountWxid, 'db_storage', 'message')
-    if (!existsSync(dbDir)) return []
-
-    const md5Id = createHash('md5').update(username).digest('hex').toLowerCase()
-    const tableName = `Msg_${md5Id}`
-    const bizDbFiles = readdirSync(dbDir).filter(f => f.startsWith('biz_message') && f.endsWith('.db'))
-
-    for (const file of bizDbFiles) {
-      const dbPath = join(dbDir, file)
-      // 检查表是否存在
-      const checkRes = await wcdbService.execQuery('message', dbPath, `SELECT name FROM sqlite_master WHERE type='table' AND lower(name)='${tableName}'`)
-      if (checkRes.success && checkRes.rows && checkRes.rows.length > 0) {
-        console.log(`[BizService] Found table ${tableName} in ${file}`)
-        // 分页查询原始行
-        const sql = `SELECT * FROM ${tableName} ORDER BY create_time DESC LIMIT ${limit} OFFSET ${offset}`
-        const queryRes = await wcdbService.execQuery('message', dbPath, sql)
-        if (queryRes.success && queryRes.rows) {
-          // *** 复用 chatService 的解析逻辑 ***
-          return chatService.mapRowsToMessagesForApi(queryRes.rows)
-        }
-      }
-    }
-
-    return []
   }
 
   async listAccounts(account?: string): Promise<BizAccount[]> {
@@ -179,7 +133,7 @@ export class BizService {
           username: uname,
           name: info?.displayName || contact.displayName || uname,
           avatar: info?.avatarUrl || '',
-          type: 0, 
+          type: 0,
           last_time: lastTime,
           formatted_last_time: lastTime ? new Date(lastTime * 1000).toISOString().split('T')[0] : ''
         }
@@ -194,23 +148,24 @@ export class BizService {
           for (const acc of result) if (typeMap[acc.username] !== undefined) acc.type = typeMap[acc.username]
         }
       }
-// 6. 排序与过滤：微信支付置顶，过滤朋友圈广告，其余按时间降序
-return result
-  .filter(acc => !acc.name.includes('朋友圈广告'))
-  .sort((a, b) => {
-    if (a.username === 'gh_3dfda90e39d6') return -1
-    if (b.username === 'gh_3dfda90e39d6') return 1
-    return b.last_time - a.last_time
-  })
+
+      return result
+        .filter(acc => !acc.name.includes('朋友圈广告'))
+        .sort((a, b) => {
+          if (a.username === 'gh_3dfda90e39d6') return -1
+          if (b.username === 'gh_3dfda90e39d6') return 1
+          return b.last_time - a.last_time
+        })
     } catch (e) { return [] }
   }
 
   async listMessages(username: string, account?: string, limit: number = 20, offset: number = 0): Promise<BizMessage[]> {
-    console.log(`[BizService] listMessages: ${username}, limit=${limit}, offset=${offset}`)
     try {
-      const rawMessages = await this.getBizRawMessages(username, account || '', limit, offset)
-      
-      const bizMessages: BizMessage[] = rawMessages.map(msg => {
+      // 仅保留核心路径：利用 chatService 的自动路由能力
+      const res = await chatService.getMessages(username, offset, limit)
+      if (!res.success || !res.messages) return []
+
+      return res.messages.map(msg => {
         const bizMsg: BizMessage = {
           local_id: msg.localId,
           create_time: msg.createTime,
@@ -229,19 +184,17 @@ return result
         }
         return bizMsg
       })
-      return bizMessages
-    } catch (e) {
-      console.error(`[BizService] listMessages error:`, e)
-      return []
-    }
+    } catch (e) { return [] }
   }
 
   async listPayRecords(account?: string, limit: number = 20, offset: number = 0): Promise<BizPayRecord[]> {
     const username = 'gh_3dfda90e39d6'
     try {
-      const rawMessages = await this.getBizRawMessages(username, account || '', limit, offset)
+      const res = await chatService.getMessages(username, offset, limit)
+      if (!res.success || !res.messages) return []
+
       const records: BizPayRecord[] = []
-      for (const msg of rawMessages) {
+      for (const msg of res.messages) {
         if (!msg.rawContent) continue
         const parsedData = this.parsePayXml(msg.rawContent)
         if (parsedData) {

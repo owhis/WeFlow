@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { useThemeStore } from '../stores/themeStore';
-import { Newspaper } from 'lucide-react';
+import { Newspaper, MessageSquareOff } from 'lucide-react';
 import './BizPage.scss';
 
 export interface BizAccount {
@@ -33,7 +33,7 @@ export const BizAccountList: React.FC<{
         console.error("获取 myWxid 失败:", e);
       }
     };
-    initWxid();
+    initWxid().then(_r => { });
   }, []);
 
   useEffect(() => {
@@ -52,7 +52,7 @@ export const BizAccountList: React.FC<{
         setLoading(false);
       }
     };
-    fetch();
+    fetch().then(_r => { } );
   }, [myWxid]);
 
   const filtered = useMemo(() => {
@@ -75,7 +75,7 @@ export const BizAccountList: React.FC<{
                 className={`biz-account-item ${selectedUsername === item.username ? 'active' : ''} ${item.username === 'gh_3dfda90e39d6' ? 'pay-account' : ''}`}
             >
               <img
-                  src={item.avatar}
+                  src={item.avatar || 'https://res.wx.qq.com/a/wx_fed/assets/res/NTI4MWU5.png'}
                   className="biz-avatar"
                   alt=""
               />
@@ -89,7 +89,7 @@ export const BizAccountList: React.FC<{
                         item.type === 0 ? 'type-sub' :
                             item.type === 2 ? 'type-enterprise' : 'type-unknown'
                 }`}>
-                  {item.type === 0 ? '服务号' : item.type === 1 ? '订阅号' : item.type === 2 ? '企业号' : '未知'}
+                  {item.type === 1 ? '服务号' : item.type === 0 ? '订阅号' : item.type === 2 ? '企业号' : '未知'}
                 </div>
               </div>
             </div>
@@ -98,7 +98,7 @@ export const BizAccountList: React.FC<{
   );
 };
 
-// 2. 公众号消息区域组件 (展示在右侧消息区)
+// 2. 公众号消息区域组件
 export const BizMessageArea: React.FC<{
   account: BizAccount | null;
 }> = ({ account }) => {
@@ -110,7 +110,6 @@ export const BizMessageArea: React.FC<{
   const limit = 20;
   const messageListRef = useRef<HTMLDivElement>(null);
 
-  // ======== 修改开始：独立从底层获取 myWxid ========
   const [myWxid, setMyWxid] = useState<string>('');
 
   useEffect(() => {
@@ -120,13 +119,10 @@ export const BizMessageArea: React.FC<{
         if (wxid) {
           setMyWxid(wxid as string);
         }
-      } catch (e) {
-        console.error("获取 myWxid 失败:", e);
-      }
+      } catch (e) { }
     };
     initWxid();
   }, []);
-  // ======== 修改结束 ========
 
   const isDark = useMemo(() => {
     if (themeMode === 'dark') return true;
@@ -136,8 +132,6 @@ export const BizMessageArea: React.FC<{
     return false;
   }, [themeMode]);
 
-  // ======== 补充修改：添加 myWxid 依赖 ========
-  // 必须加上 myWxid 作为依赖项，否则第一次点击左侧账号时，如果 wxid 还没异步拿回来，就不会触发加载
   useEffect(() => {
     if (account && myWxid) {
       setMessages([]);
@@ -146,19 +140,16 @@ export const BizMessageArea: React.FC<{
       loadMessages(account.username, 0);
     }
   }, [account, myWxid]);
-  // ======== 补充修改结束 ========
 
   const loadMessages = async (username: string, currentOffset: number) => {
-    if (loading || !myWxid) return; // 没账号直接 return
+    if (loading || !myWxid) return;
 
     setLoading(true);
     try {
       let res;
       if (username === 'gh_3dfda90e39d6') {
-        // 传入 myWxid
         res = await window.electronAPI.biz.listPayRecords(myWxid, limit, currentOffset);
       } else {
-        // 传入 myWxid，替换掉 undefined
         res = await window.electronAPI.biz.listMessages(username, myWxid, limit, currentOffset);
       }
       if (res) {
@@ -201,15 +192,20 @@ export const BizMessageArea: React.FC<{
         <div className="message-container" onScroll={handleScroll} ref={messageListRef}>
           <div className="messages-wrapper">
             {!loading && messages.length === 0 && (
-              <div className="biz-no-record">
-                <p>暂无本地记录</p>
+              <div className="biz-no-record-container">
+                <div className="no-record-icon">
+                  <MessageSquareOff size={48} />
+                </div>
+                <h3>暂无本地记录</h3>
+                <p>该公众号在当前数据库中没有可显示的聊天历史</p>
               </div>
             )}
-            {messages.map((msg) => (                <div key={msg.local_id}>
+            {messages.map((msg) => (
+                <div key={msg.local_id}>
                   {account.username === 'gh_3dfda90e39d6' ? (
                       <div className="pay-card">
                         <div className="pay-header">
-                          {msg.merchant_icon ? <img src={msg.merchant_icon} className="pay-icon" alt=""/> : <div className="pay-icon placeholder">¥</div>}
+                          {msg.merchant_icon ? <img src={msg.merchant_icon} className="pay-icon" alt=""/> : <div className="pay-icon-placeholder">¥</div>}
                           <span>{msg.merchant_name || '微信支付'}</span>
                         </div>
                         <div className="pay-title">{msg.title}</div>
@@ -223,9 +219,9 @@ export const BizMessageArea: React.FC<{
                           <div className="article-overlay"><h3 className="article-title">{msg.title}</h3></div>
                         </div>
                         {msg.des && <div className="article-digest">{msg.des}</div>}
-                        {msg.content_list && msg.content_list.length > 0 && (
+                        {msg.content_list && msg.content_list.length > 1 && (
                             <div className="sub-articles">
-                              {msg.content_list.map((item: any, idx: number) => (
+                              {msg.content_list.slice(1).map((item: any, idx: number) => (
                                   <div key={idx} onClick={() => window.electronAPI.shell.openExternal(item.url)} className="sub-item">
                                     <span className="sub-title">{item.title}</span>
                                     {item.cover && <img src={item.cover} className="sub-cover" alt=""/>}
@@ -244,7 +240,6 @@ export const BizMessageArea: React.FC<{
   );
 };
 
-// 保持 BizPage 作为入口 (如果需要独立页面)
 const BizPage: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useState<BizAccount | null>(null);
   return (

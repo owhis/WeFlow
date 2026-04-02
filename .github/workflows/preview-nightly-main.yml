@@ -256,10 +256,6 @@ jobs:
           - 该版本为 **预览版**，用于提前体验即将发布的功能与修复。
           - 可能包含尚未完全稳定的改动，不建议长期使用
 
-          ## 渠道信息
-          - 更新通道：\`preview\`（Windows arm64 使用 \`preview-arm64\`）
-          - 完整发布页：$RELEASE_PAGE
-
           ## 下载
           - Windows x64: ${WINDOWS_URL:-$RELEASE_PAGE}
           - Windows arm64: ${WINDOWS_ARM64_URL:-$RELEASE_PAGE}

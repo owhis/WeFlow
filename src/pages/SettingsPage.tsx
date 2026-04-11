@@ -16,9 +16,23 @@ import {
 import { Avatar } from '../components/Avatar'
 import './SettingsPage.scss'
 
-type SettingsTab = 'appearance' | 'notification' | 'antiRevoke' | 'database' | 'models' | 'cache' | 'api' | 'updates' | 'security' | 'about' | 'analytics' | 'insight'
+type SettingsTab =
+  | 'appearance'
+  | 'notification'
+  | 'antiRevoke'
+  | 'database'
+  | 'models'
+  | 'cache'
+  | 'api'
+  | 'updates'
+  | 'security'
+  | 'about'
+  | 'analytics'
+  | 'aiCommon'
+  | 'insight'
+  | 'aiFootprint'
 
-const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
+const tabs: { id: Exclude<SettingsTab, 'insight' | 'aiFootprint'>; label: string; icon: React.ElementType }[] = [
   { id: 'appearance', label: '外观', icon: Palette },
   { id: 'notification', label: '通知', icon: Bell },
   { id: 'antiRevoke', label: '防撤回', icon: RotateCcw },
@@ -27,10 +41,15 @@ const tabs: { id: SettingsTab; label: string; icon: React.ElementType }[] = [
   { id: 'cache', label: '缓存', icon: HardDrive },
   { id: 'api', label: 'API 服务', icon: Globe },
   { id: 'analytics', label: '分析', icon: BarChart2 },
-  { id: 'insight', label: 'AI 见解', icon: Sparkles },
   { id: 'security', label: '安全', icon: ShieldCheck },
   { id: 'updates', label: '版本更新', icon: RefreshCw },
   { id: 'about', label: '关于', icon: Info }
+]
+
+const aiTabs: Array<{ id: Extract<SettingsTab, 'aiCommon' | 'insight' | 'aiFootprint'>; label: string }> = [
+  { id: 'aiCommon', label: 'AI 通用' },
+  { id: 'insight', label: 'AI 见解' },
+  { id: 'aiFootprint', label: 'AI 足迹' }
 ]
 
 const isMac = navigator.userAgent.toLowerCase().includes('mac')
@@ -88,6 +107,7 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
   const clearAnalyticsStoreCache = useAnalyticsStore((state) => state.clearCache)
 
   const [activeTab, setActiveTab] = useState<SettingsTab>('appearance')
+  const [aiGroupExpanded, setAiGroupExpanded] = useState(false)
   const [decryptKey, setDecryptKey] = useState('')
   const [imageXorKey, setImageXorKey] = useState('')
   const [imageAesKey, setImageAesKey] = useState('')
@@ -217,9 +237,9 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
 
   // AI 见解 state
   const [aiInsightEnabled, setAiInsightEnabled] = useState(false)
-  const [aiInsightApiBaseUrl, setAiInsightApiBaseUrl] = useState('')
-  const [aiInsightApiKey, setAiInsightApiKey] = useState('')
-  const [aiInsightApiModel, setAiInsightApiModel] = useState('gpt-4o-mini')
+  const [aiModelApiBaseUrl, setAiModelApiBaseUrl] = useState('')
+  const [aiModelApiKey, setAiModelApiKey] = useState('')
+  const [aiModelApiModel, setAiModelApiModel] = useState('gpt-4o-mini')
   const [aiInsightSilenceDays, setAiInsightSilenceDays] = useState(3)
   const [aiInsightAllowContext, setAiInsightAllowContext] = useState(false)
   const [isTestingInsight, setIsTestingInsight] = useState(false)
@@ -237,6 +257,8 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
   const [aiInsightTelegramEnabled, setAiInsightTelegramEnabled] = useState(false)
   const [aiInsightTelegramToken, setAiInsightTelegramToken] = useState('')
   const [aiInsightTelegramChatIds, setAiInsightTelegramChatIds] = useState('')
+  const [aiFootprintEnabled, setAiFootprintEnabled] = useState(false)
+  const [aiFootprintSystemPrompt, setAiFootprintSystemPrompt] = useState('')
 
   // 检查 Hello 可用性
   useEffect(() => {
@@ -275,6 +297,12 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
     if (!initialTab) return
     setActiveTab(initialTab)
   }, [location.state])
+
+  useEffect(() => {
+    if (activeTab === 'aiCommon' || activeTab === 'insight' || activeTab === 'aiFootprint') {
+      setAiGroupExpanded(true)
+    }
+  }, [activeTab])
 
   useEffect(() => {
     if (!onClose) return
@@ -448,9 +476,9 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
 
       // 加载 AI 见解配置
       const savedAiInsightEnabled = await configService.getAiInsightEnabled()
-      const savedAiInsightApiBaseUrl = await configService.getAiInsightApiBaseUrl()
-      const savedAiInsightApiKey = await configService.getAiInsightApiKey()
-      const savedAiInsightApiModel = await configService.getAiInsightApiModel()
+      const savedAiModelApiBaseUrl = await configService.getAiModelApiBaseUrl()
+      const savedAiModelApiKey = await configService.getAiModelApiKey()
+      const savedAiModelApiModel = await configService.getAiModelApiModel()
       const savedAiInsightSilenceDays = await configService.getAiInsightSilenceDays()
   const savedAiInsightAllowContext = await configService.getAiInsightAllowContext()
   const savedAiInsightWhitelistEnabled = await configService.getAiInsightWhitelistEnabled()
@@ -462,10 +490,12 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
   const savedAiInsightTelegramEnabled = await configService.getAiInsightTelegramEnabled()
   const savedAiInsightTelegramToken = await configService.getAiInsightTelegramToken()
   const savedAiInsightTelegramChatIds = await configService.getAiInsightTelegramChatIds()
+  const savedAiFootprintEnabled = await configService.getAiFootprintEnabled()
+  const savedAiFootprintSystemPrompt = await configService.getAiFootprintSystemPrompt()
   setAiInsightEnabled(savedAiInsightEnabled)
-  setAiInsightApiBaseUrl(savedAiInsightApiBaseUrl)
-  setAiInsightApiKey(savedAiInsightApiKey)
-  setAiInsightApiModel(savedAiInsightApiModel)
+  setAiModelApiBaseUrl(savedAiModelApiBaseUrl)
+  setAiModelApiKey(savedAiModelApiKey)
+  setAiModelApiModel(savedAiModelApiModel)
   setAiInsightSilenceDays(savedAiInsightSilenceDays)
   setAiInsightAllowContext(savedAiInsightAllowContext)
   setAiInsightWhitelistEnabled(savedAiInsightWhitelistEnabled)
@@ -477,6 +507,8 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
   setAiInsightTelegramEnabled(savedAiInsightTelegramEnabled)
   setAiInsightTelegramToken(savedAiInsightTelegramToken)
   setAiInsightTelegramChatIds(savedAiInsightTelegramChatIds)
+  setAiFootprintEnabled(savedAiFootprintEnabled)
+  setAiFootprintSystemPrompt(savedAiFootprintSystemPrompt)
 
     } catch (e: any) {
       console.error('加载配置失败:', e)
@@ -2498,6 +2530,118 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
     }
   }
 
+  const renderAiCommonTab = () => (
+    <div className="tab-content">
+      <div className="form-group">
+        <label>通用 API 地址</label>
+        <span className="form-hint">
+          这是「AI 见解」与「AI 足迹总结」共享的模型接入配置。填写 OpenAI 兼容接口的 <strong>Base URL</strong>，末尾<strong>不要加斜杠</strong>。
+          程序会自动拼接 <code>/chat/completions</code>。
+          <br />
+          示例：<code>https://api.ohmygpt.com/v1</code> 或 <code>https://api.openai.com/v1</code>
+        </span>
+        <input
+          type="text"
+          className="field-input"
+          value={aiModelApiBaseUrl}
+          placeholder="https://api.ohmygpt.com/v1"
+          onChange={(e) => {
+            const val = e.target.value
+            setAiModelApiBaseUrl(val)
+            scheduleConfigSave('aiModelApiBaseUrl', () => configService.setAiModelApiBaseUrl(val))
+          }}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>通用 API Key</label>
+        <span className="form-hint">
+          你的 API Key，保存后经过系统加密存储，不会明文写入磁盘。
+        </span>
+        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
+          <input
+            type={showInsightApiKey ? 'text' : 'password'}
+            className="field-input"
+            value={aiModelApiKey}
+            placeholder="sk-..."
+            onChange={(e) => {
+              const val = e.target.value
+              setAiModelApiKey(val)
+              scheduleConfigSave('aiModelApiKey', () => configService.setAiModelApiKey(val))
+            }}
+            style={{ flex: 1 }}
+          />
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowInsightApiKey(!showInsightApiKey)}
+            title={showInsightApiKey ? '隐藏' : '显示'}
+          >
+            {showInsightApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
+          </button>
+          {aiModelApiKey && (
+            <button
+              className="btn btn-danger"
+              onClick={async () => {
+                setAiModelApiKey('')
+                await configService.setAiModelApiKey('')
+              }}
+              title="清除 Key"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="form-group">
+        <label>通用模型名称</label>
+        <span className="form-hint">
+          填写你的 API 提供商支持的模型名，将同时用于见解和足迹模块。
+          <br />
+          常用示例：<code>gpt-4o-mini</code>、<code>gpt-4o</code>、<code>deepseek-chat</code>、<code>claude-3-5-haiku-20241022</code>
+        </span>
+        <input
+          type="text"
+          className="field-input"
+          value={aiModelApiModel}
+          placeholder="gpt-4o-mini"
+          onChange={(e) => {
+            const val = e.target.value.trim() || 'gpt-4o-mini'
+            setAiModelApiModel(val)
+            scheduleConfigSave('aiModelApiModel', () => configService.setAiModelApiModel(val))
+          }}
+          style={{ width: 260 }}
+        />
+      </div>
+
+      <div className="form-group">
+        <label>连接测试</label>
+        <span className="form-hint">
+          测试通用模型连接，见解与足迹都会使用这套配置。
+        </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={handleTestInsightConnection}
+            disabled={isTestingInsight || !aiModelApiBaseUrl || !aiModelApiKey}
+          >
+            {isTestingInsight ? (
+              <><Loader2 size={14} style={{ marginRight: 4, animation: 'spin 1s linear infinite' }} />测试中...</>
+            ) : (
+              <>测试 API 连接</>
+            )}
+          </button>
+          {insightTestResult && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: insightTestResult.success ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
+              {insightTestResult.success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+              {insightTestResult.message}
+            </span>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+
   const renderInsightTab = () => (
     <div className="tab-content">
       {/* 总开关 */}
@@ -2526,149 +2670,41 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
 
       <div className="divider" />
 
-      {/* API 配置 */}
-      <div className="form-group">
-        <label>API 地址</label>
-        <span className="form-hint">
-          填写 OpenAI 兼容接口的 <strong>Base URL</strong>，末尾<strong>不要加斜杠</strong>。
-          程序会自动拼接 <code>/chat/completions</code>。
-          <br />
-          示例：<code>https://api.ohmygpt.com/v1</code> 或 <code>https://api.openai.com/v1</code>
-        </span>
-        <input
-          type="text"
-          className="field-input"
-          value={aiInsightApiBaseUrl}
-          placeholder="https://api.ohmygpt.com/v1"
-          onChange={(e) => {
-            const val = e.target.value
-            setAiInsightApiBaseUrl(val)
-            scheduleConfigSave('aiInsightApiBaseUrl', () => configService.setAiInsightApiBaseUrl(val))
-          }}
-          style={{ fontFamily: 'monospace' }}
-        />
-      </div>
-
-      <div className="form-group">
-        <label>API Key</label>
-        <span className="form-hint">
-          你的 API Key，保存后经过系统加密存储，不会明文写入磁盘。
-        </span>
-        <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-          <input
-            type={showInsightApiKey ? 'text' : 'password'}
-            className="field-input"
-            value={aiInsightApiKey}
-            placeholder="sk-..."
-            onChange={(e) => {
-              const val = e.target.value
-              setAiInsightApiKey(val)
-              scheduleConfigSave('aiInsightApiKey', () => configService.setAiInsightApiKey(val))
-            }}
-            style={{ flex: 1, fontFamily: 'monospace' }}
-          />
-          <button
-            className="btn btn-secondary"
-            onClick={() => setShowInsightApiKey(!showInsightApiKey)}
-            title={showInsightApiKey ? '隐藏' : '显示'}
-          >
-            {showInsightApiKey ? <EyeOff size={14} /> : <Eye size={14} />}
-          </button>
-          {aiInsightApiKey && (
-            <button
-              className="btn btn-danger"
-              onClick={async () => {
-                setAiInsightApiKey('')
-                await configService.setAiInsightApiKey('')
-              }}
-              title="清除 Key"
-            >
-              <Trash2 size={14} />
-            </button>
-          )}
-        </div>
-      </div>
-
-      <div className="form-group">
-        <label>模型名称</label>
-        <span className="form-hint">
-          填写你的 API 提供商支持的模型名，建议使用综合能力较强的模型以获得有洞察力的见解。
-          <br />
-          常用示例：<code>gpt-4o-mini</code>、<code>gpt-4o</code>、<code>deepseek-chat</code>、<code>claude-3-5-haiku-20241022</code>
-        </span>
-        <input
-          type="text"
-          className="field-input"
-          value={aiInsightApiModel}
-          placeholder="gpt-4o-mini"
-          onChange={(e) => {
-            const val = e.target.value.trim() || 'gpt-4o-mini'
-            setAiInsightApiModel(val)
-            scheduleConfigSave('aiInsightApiModel', () => configService.setAiInsightApiModel(val))
-          }}
-          style={{ width: 260, fontFamily: 'monospace' }}
-        />
-      </div>
-
-      {/* 测试连接 + 触发测试 */}
       <div className="form-group">
         <label>调试工具</label>
         <span className="form-hint">
-          先用"测试 API 连接"确认 Key 和 URL 填写正确，再用"立即触发测试见解"验证完整链路（数据库→API→弹窗）。触发后请留意右下角通知弹窗。
+          该功能依赖「AI 通用」里的模型配置。用于验证完整链路（数据库→API→弹窗）。
         </span>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px', marginTop: '10px' }}>
-          {/* 测试 API 连接 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={handleTestInsightConnection}
-              disabled={isTestingInsight || !aiInsightApiBaseUrl || !aiInsightApiKey}
-            >
-              {isTestingInsight ? (
-                <><Loader2 size={14} style={{ marginRight: 4, animation: 'spin 1s linear infinite' }} />测试中...</>
-              ) : (
-                <>测试 API 连接</>
-              )}
-            </button>
-            {insightTestResult && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: insightTestResult.success ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
-                {insightTestResult.success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                {insightTestResult.message}
-              </span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap', marginTop: '10px' }}>
+          <button
+            className="btn btn-secondary"
+            onClick={async () => {
+              setIsTriggeringInsightTest(true)
+              setInsightTriggerResult(null)
+              try {
+                const result = await (window.electronAPI as any).insight.triggerTest()
+                setInsightTriggerResult(result)
+              } catch (e: any) {
+                setInsightTriggerResult({ success: false, message: `调用失败：${e?.message || String(e)}` })
+              } finally {
+                setIsTriggeringInsightTest(false)
+              }
+            }}
+            disabled={isTriggeringInsightTest || !aiInsightEnabled || !aiModelApiBaseUrl || !aiModelApiKey}
+            title={!aiInsightEnabled ? '请先开启 AI 见解总开关' : ''}
+          >
+            {isTriggeringInsightTest ? (
+              <><Loader2 size={14} style={{ marginRight: 4, animation: 'spin 1s linear infinite' }} />触发中...</>
+            ) : (
+              <>立即触发测试见解</>
             )}
-          </div>
-          {/* 触发测试见解 */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
-            <button
-              className="btn btn-secondary"
-              onClick={async () => {
-                setIsTriggeringInsightTest(true)
-                setInsightTriggerResult(null)
-                try {
-                  const result = await (window.electronAPI as any).insight.triggerTest()
-                  setInsightTriggerResult(result)
-                } catch (e: any) {
-                  setInsightTriggerResult({ success: false, message: `调用失败：${e?.message || String(e)}` })
-                } finally {
-                  setIsTriggeringInsightTest(false)
-                }
-              }}
-              disabled={isTriggeringInsightTest || !aiInsightEnabled || !aiInsightApiBaseUrl || !aiInsightApiKey}
-              title={!aiInsightEnabled ? '请先开启 AI 见解总开关' : ''}
-            >
-              {isTriggeringInsightTest ? (
-                <><Loader2 size={14} style={{ marginRight: 4, animation: 'spin 1s linear infinite' }} />触发中...</>
-              ) : (
-                <>立即触发测试见解</>
-              )}
-            </button>
-            {insightTriggerResult && (
-              <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: insightTriggerResult.success ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
-                {insightTriggerResult.success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
-                {insightTriggerResult.message}
-              </span>
-            )}
-          </div>
+          </button>
+          {insightTriggerResult && (
+            <span style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: insightTriggerResult.success ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
+              {insightTriggerResult.success ? <CheckCircle2 size={14} /> : <XCircle size={14} />}
+              {insightTriggerResult.message}
+            </span>
+          )}
         </div>
       </div>
 
@@ -2824,9 +2860,9 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
               当前显示内置默认提示词，可直接编辑修改。修改后立即生效，无需重启。可变的统计信息（触发次数、对话内容）会自动附加在用户消息里，无需在此填写。
             </span>
             <textarea
-              className="field-input"
+              className="field-input ai-prompt-textarea"
               rows={8}
-              style={{ width: '100%', resize: 'vertical', fontFamily: 'monospace', fontSize: 12 }}
+              style={{ width: '100%', resize: 'vertical' }}
               value={displayValue}
               onChange={(e) => {
                 const val = e.target.value
@@ -3103,6 +3139,74 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
           </div>
         </div>
       </div>
+    </div>
+  )
+
+  const renderAiFootprintTab = () => (
+    <div className="tab-content">
+      {(() => {
+        const DEFAULT_FOOTPRINT_PROMPT = `你是用户的聊天足迹教练，负责基于统计数据给出一段简明复盘。
+要求：
+1. 输出 2-3 句，总长度不超过 180 字。
+2. 必须包含：总体观察 + 一个可执行建议。
+3. 语气务实，不夸张，不使用 Markdown。`
+        const displayValue = aiFootprintSystemPrompt || DEFAULT_FOOTPRINT_PROMPT
+        return (
+          <>
+            <div className="form-group">
+              <label>AI 足迹总结</label>
+              <span className="form-hint">
+                开启后，可在「我的微信足迹」页面一键生成当前范围的 AI 复盘总结。
+              </span>
+              <div className="log-toggle-line">
+                <span className="log-status">{aiFootprintEnabled ? '已开启' : '已关闭'}</span>
+                <label className="switch">
+                  <input
+                    type="checkbox"
+                    checked={aiFootprintEnabled}
+                    onChange={async (e) => {
+                      const val = e.target.checked
+                      setAiFootprintEnabled(val)
+                      await configService.setAiFootprintEnabled(val)
+                    }}
+                  />
+                  <span className="switch-slider" />
+                </label>
+              </div>
+            </div>
+
+            <div className="form-group">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
+                <label style={{ marginBottom: 0 }}>足迹总结提示词</label>
+                <button
+                  className="button-secondary"
+                  style={{ fontSize: 12, padding: '3px 10px' }}
+                  onClick={async () => {
+                    setAiFootprintSystemPrompt('')
+                    await configService.setAiFootprintSystemPrompt('')
+                  }}
+                >
+                  恢复默认
+                </button>
+              </div>
+              <span className="form-hint">
+                足迹模块专用的小配置。留空时使用内置默认提示词。
+              </span>
+              <textarea
+                className="field-input ai-prompt-textarea"
+                rows={6}
+                style={{ width: '100%', resize: 'vertical' }}
+                value={displayValue}
+                onChange={(e) => {
+                  const val = e.target.value
+                  setAiFootprintSystemPrompt(val)
+                  scheduleConfigSave('aiFootprintSystemPrompt', () => configService.setAiFootprintSystemPrompt(val))
+                }}
+              />
+            </div>
+          </>
+        )
+      })()}
     </div>
   )
 
@@ -3780,6 +3884,33 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
                 <span>{tab.label}</span>
               </button>
             ))}
+
+            <div className={`tab-group ${aiGroupExpanded ? 'expanded' : ''}`}>
+              <button
+                className={`tab-btn tab-group-trigger ${(activeTab === 'aiCommon' || activeTab === 'insight' || activeTab === 'aiFootprint') ? 'active' : ''}`}
+                onClick={() => setAiGroupExpanded((prev) => !prev)}
+                aria-expanded={aiGroupExpanded}
+              >
+                <Sparkles size={16} />
+                <span>AI 相关</span>
+                <ChevronDown size={14} className={`tab-group-arrow ${aiGroupExpanded ? 'expanded' : ''}`} />
+              </button>
+              <div className={`tab-sublist-wrap ${aiGroupExpanded ? 'expanded' : 'collapsed'}`}>
+                <div className="tab-sublist">
+                  {aiTabs.map((tab) => (
+                    <button
+                      key={tab.id}
+                      className={`tab-btn tab-sub-btn ${activeTab === tab.id ? 'active' : ''}`}
+                      onClick={() => setActiveTab(tab.id)}
+                      tabIndex={aiGroupExpanded ? 0 : -1}
+                    >
+                      <span className="tab-sub-dot" />
+                      <span>{tab.label}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
           </div>
 
           <div className="settings-body">
@@ -3790,7 +3921,9 @@ function SettingsPage({ onClose }: SettingsPageProps = {}) {
             {activeTab === 'models' && renderModelsTab()}
             {activeTab === 'cache' && renderCacheTab()}
             {activeTab === 'api' && renderApiTab()}
+            {activeTab === 'aiCommon' && renderAiCommonTab()}
             {activeTab === 'insight' && renderInsightTab()}
+            {activeTab === 'aiFootprint' && renderAiFootprintTab()}
             {activeTab === 'updates' && renderUpdatesTab()}
             {activeTab === 'analytics' && renderAnalyticsTab()}
             {activeTab === 'security' && renderSecurityTab()}

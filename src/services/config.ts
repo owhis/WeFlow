@@ -83,6 +83,9 @@ export const CONFIG_KEYS = {
   ANALYTICS_DENY_COUNT: 'analyticsDenyCount',
 
   // AI 见解
+  AI_MODEL_API_BASE_URL: 'aiModelApiBaseUrl',
+  AI_MODEL_API_KEY: 'aiModelApiKey',
+  AI_MODEL_API_MODEL: 'aiModelApiModel',
   AI_INSIGHT_ENABLED: 'aiInsightEnabled',
   AI_INSIGHT_API_BASE_URL: 'aiInsightApiBaseUrl',
   AI_INSIGHT_API_KEY: 'aiInsightApiKey',
@@ -97,7 +100,11 @@ export const CONFIG_KEYS = {
   AI_INSIGHT_SYSTEM_PROMPT: 'aiInsightSystemPrompt',
   AI_INSIGHT_TELEGRAM_ENABLED: 'aiInsightTelegramEnabled',
   AI_INSIGHT_TELEGRAM_TOKEN: 'aiInsightTelegramToken',
-  AI_INSIGHT_TELEGRAM_CHAT_IDS: 'aiInsightTelegramChatIds'
+  AI_INSIGHT_TELEGRAM_CHAT_IDS: 'aiInsightTelegramChatIds',
+
+  // AI 足迹
+  AI_FOOTPRINT_ENABLED: 'aiFootprintEnabled',
+  AI_FOOTPRINT_SYSTEM_PROMPT: 'aiFootprintSystemPrompt'
 } as const
 
 export interface WxidConfig {
@@ -1586,6 +1593,39 @@ export async function setHttpApiHost(host: string): Promise<void> {
 
 // ─── AI 见解 ──────────────────────────────────────────────────────────────────
 
+export async function getAiModelApiBaseUrl(): Promise<string> {
+  const value = await config.get(CONFIG_KEYS.AI_MODEL_API_BASE_URL)
+  if (typeof value === 'string' && value.trim()) return value
+  const legacy = await config.get(CONFIG_KEYS.AI_INSIGHT_API_BASE_URL)
+  return typeof legacy === 'string' ? legacy : ''
+}
+
+export async function setAiModelApiBaseUrl(url: string): Promise<void> {
+  await config.set(CONFIG_KEYS.AI_MODEL_API_BASE_URL, url)
+}
+
+export async function getAiModelApiKey(): Promise<string> {
+  const value = await config.get(CONFIG_KEYS.AI_MODEL_API_KEY)
+  if (typeof value === 'string' && value.trim()) return value
+  const legacy = await config.get(CONFIG_KEYS.AI_INSIGHT_API_KEY)
+  return typeof legacy === 'string' ? legacy : ''
+}
+
+export async function setAiModelApiKey(key: string): Promise<void> {
+  await config.set(CONFIG_KEYS.AI_MODEL_API_KEY, key)
+}
+
+export async function getAiModelApiModel(): Promise<string> {
+  const value = await config.get(CONFIG_KEYS.AI_MODEL_API_MODEL)
+  if (typeof value === 'string' && value.trim()) return value.trim()
+  const legacy = await config.get(CONFIG_KEYS.AI_INSIGHT_API_MODEL)
+  return typeof legacy === 'string' && legacy.trim() ? legacy.trim() : 'gpt-4o-mini'
+}
+
+export async function setAiModelApiModel(model: string): Promise<void> {
+  await config.set(CONFIG_KEYS.AI_MODEL_API_MODEL, model)
+}
+
 export async function getAiInsightEnabled(): Promise<boolean> {
   const value = await config.get(CONFIG_KEYS.AI_INSIGHT_ENABLED)
   return value === true
@@ -1596,30 +1636,30 @@ export async function setAiInsightEnabled(enabled: boolean): Promise<void> {
 }
 
 export async function getAiInsightApiBaseUrl(): Promise<string> {
-  const value = await config.get(CONFIG_KEYS.AI_INSIGHT_API_BASE_URL)
-  return typeof value === 'string' ? value : ''
+  return getAiModelApiBaseUrl()
 }
 
 export async function setAiInsightApiBaseUrl(url: string): Promise<void> {
   await config.set(CONFIG_KEYS.AI_INSIGHT_API_BASE_URL, url)
+  await setAiModelApiBaseUrl(url)
 }
 
 export async function getAiInsightApiKey(): Promise<string> {
-  const value = await config.get(CONFIG_KEYS.AI_INSIGHT_API_KEY)
-  return typeof value === 'string' ? value : ''
+  return getAiModelApiKey()
 }
 
 export async function setAiInsightApiKey(key: string): Promise<void> {
   await config.set(CONFIG_KEYS.AI_INSIGHT_API_KEY, key)
+  await setAiModelApiKey(key)
 }
 
 export async function getAiInsightApiModel(): Promise<string> {
-  const value = await config.get(CONFIG_KEYS.AI_INSIGHT_API_MODEL)
-  return typeof value === 'string' && value.trim() ? value.trim() : 'gpt-4o-mini'
+  return getAiModelApiModel()
 }
 
 export async function setAiInsightApiModel(model: string): Promise<void> {
   await config.set(CONFIG_KEYS.AI_INSIGHT_API_MODEL, model)
+  await setAiModelApiModel(model)
 }
 
 export async function getAiInsightSilenceDays(): Promise<number> {
@@ -1719,4 +1759,22 @@ export async function getAiInsightTelegramChatIds(): Promise<string> {
 
 export async function setAiInsightTelegramChatIds(chatIds: string): Promise<void> {
   await config.set(CONFIG_KEYS.AI_INSIGHT_TELEGRAM_CHAT_IDS, chatIds)
+}
+
+export async function getAiFootprintEnabled(): Promise<boolean> {
+  const value = await config.get(CONFIG_KEYS.AI_FOOTPRINT_ENABLED)
+  return value === true
+}
+
+export async function setAiFootprintEnabled(enabled: boolean): Promise<void> {
+  await config.set(CONFIG_KEYS.AI_FOOTPRINT_ENABLED, enabled)
+}
+
+export async function getAiFootprintSystemPrompt(): Promise<string> {
+  const value = await config.get(CONFIG_KEYS.AI_FOOTPRINT_SYSTEM_PROMPT)
+  return typeof value === 'string' ? value : ''
+}
+
+export async function setAiFootprintSystemPrompt(prompt: string): Promise<void> {
+  await config.set(CONFIG_KEYS.AI_FOOTPRINT_SYSTEM_PROMPT, prompt)
 }

@@ -1075,6 +1075,24 @@ export interface ElectronAPI {
     stop: () => Promise<{ success: boolean }>
     status: () => Promise<{ running: boolean; port: number; mediaExportPath: string }>
   }
+  insight: {
+    testConnection: () => Promise<{ success: boolean; message: string }>
+    getTodayStats: () => Promise<Array<{ sessionId: string; count: number; times: string[] }>>
+    triggerTest: () => Promise<{ success: boolean; message: string }>
+    generateFootprintInsight: (payload: {
+      rangeLabel: string
+      summary: {
+        private_inbound_people?: number
+        private_replied_people?: number
+        private_outbound_people?: number
+        private_reply_rate?: number
+        mention_count?: number
+        mention_group_count?: number
+      }
+      privateSegments?: Array<{ displayName?: string; session_id?: string; incoming_count?: number; outgoing_count?: number; message_count?: number; replied?: boolean }>
+      mentionGroups?: Array<{ displayName?: string; session_id?: string; count?: number }>
+    }) => Promise<{ success: boolean; message: string; insight?: string }>
+  }
 }
 
 export interface ExportOptions {

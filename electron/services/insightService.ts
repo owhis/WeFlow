@@ -39,6 +39,9 @@ const DEFAULT_SILENCE_DAYS = 3
 const INSIGHT_CONFIG_KEYS = new Set([
   'aiInsightEnabled',
   'aiInsightScanIntervalHours',
+  'aiModelApiBaseUrl',
+  'aiModelApiKey',
+  'aiModelApiModel',
   'dbPath',
   'decryptKey',
   'myWxid'
@@ -49,6 +52,12 @@ const INSIGHT_CONFIG_KEYS = new Set([
 interface TodayTriggerRecord {
   /** 该会话今日触发的时间戳列表（毫秒） */
   timestamps: number[]
+}
+
+interface SharedAiModelConfig {
+  apiBaseUrl: string
+  apiKey: string
+  model: string
 }
 
 // ─── 日志 ─────────────────────────────────────────────────────────────────────
@@ -320,9 +329,7 @@ class InsightService {
    * 供设置页"测试连接"按钮调用。
    */
   async testConnection(): Promise<{ success: boolean; message: string }> {
-    const apiBaseUrl = this.config.get('aiInsightApiBaseUrl') as string
-    const apiKey = this.config.get('aiInsightApiKey') as string
-    const model = (this.config.get('aiInsightApiModel') as string) || 'gpt-4o-mini'
+    const { apiBaseUrl, apiKey, model } = this.getSharedAiModelConfig()
 
     if (!apiBaseUrl || !apiKey) {
       return { success: false, message: '请先填写 API 地址和 API Key' }
@@ -348,8 +355,7 @@ class InsightService {
    */
   async triggerTest(): Promise<{ success: boolean; message: string }> {
     insightLog('INFO', '手动触发测试见解...')
-    const apiBaseUrl = this.config.get('aiInsightApiBaseUrl') as string
-    const apiKey = this.config.get('aiInsightApiKey') as string
+    const { apiBaseUrl, apiKey } = this.getSharedAiModelConfig()
     if (!apiBaseUrl || !apiKey) {
       return { success: false, message: '请先填写 API 地址和 Key' }
     }
@@ -398,10 +404,122 @@ class InsightService {
     return result
   }
 
+  async generateFootprintInsight(params: {
+    rangeLabel: string
+    summary: {
+      private_inbound_people?: number
+      private_replied_people?: number
+      private_outbound_people?: number
+      private_reply_rate?: number
+      mention_count?: number
+      mention_group_count?: number
+    }
+    privateSegments?: Array<{ displayName?: string; session_id?: string; incoming_count?: number; outgoing_count?: number; message_count?: number; replied?: boolean }>
+    mentionGroups?: Array<{ displayName?: string; session_id?: string; count?: number }>
+  }): Promise<{ success: boolean; message: string; insight?: string }> {
+    const enabled = this.config.get('aiFootprintEnabled') === true
+    if (!enabled) {
+      return { success: false, message: '请先在设置中开启「AI 足迹总结」' }
+    }
+
+    const { apiBaseUrl, apiKey, model } = this.getSharedAiModelConfig()
+    if (!apiBaseUrl || !apiKey) {
+      return { success: false, message: '请先填写通用 AI 模型配置（API 地址和 Key）' }
+    }
+
+    const summary = params?.summary || {}
+    const rangeLabel = String(params?.rangeLabel || '').trim() || '当前范围'
+    const privateSegments = Array.isArray(params?.privateSegments) ? params.privateSegments.slice(0, 6) : []
+    const mentionGroups = Array.isArray(params?.mentionGroups) ? params.mentionGroups.slice(0, 6) : []
+
+    const topPrivateText = privateSegments.length > 0
+      ? privateSegments
+        .map((item, idx) => {
+          const name = String(item.displayName || item.session_id || `联系人${idx + 1}`).trim()
+          const inbound = Number(item.incoming_count) || 0
+          const outbound = Number(item.outgoing_count) || 0
+          const total = Math.max(Number(item.message_count) || 0, inbound + outbound)
+          return `${idx + 1}. ${name}（收${inbound}/发${outbound}/总${total}${item.replied ? '/已回复' : ''}）`
+        })
+        .join('\n')
+      : '无'
+
+    const topMentionText = mentionGroups.length > 0
+      ? mentionGroups
+        .map((item, idx) => {
+          const name = String(item.displayName || item.session_id || `群聊${idx + 1}`).trim()
+          const count = Number(item.count) || 0
+          return `${idx + 1}. ${name}（@我 ${count} 次）`
+        })
+        .join('\n')
+      : '无'
+
+    const defaultSystemPrompt = `你是用户的聊天足迹教练，负责基于统计数据给出一段简明复盘。
+要求：
+1. 输出 2-3 句，总长度不超过 180 字。
+2. 必须包含：总体观察 + 一个可执行建议。
+3. 语气务实，不夸张，不使用 Markdown。`
+    const customPrompt = String(this.config.get('aiFootprintSystemPrompt') || '').trim()
+    const systemPrompt = customPrompt || defaultSystemPrompt
+
+    const userPrompt = `统计范围：${rangeLabel}
+有聊天的人数：${Number(summary.private_inbound_people) || 0}
+我有回复的人数：${Number(summary.private_outbound_people) || 0}
+回复率：${(((Number(summary.private_reply_rate) || 0) * 100)).toFixed(1)}%
+@我次数：${Number(summary.mention_count) || 0}
+涉及群聊：${Number(summary.mention_group_count) || 0}
+
+私聊重点：
+${topPrivateText}
+
+群聊@我重点：
+${topMentionText}
+
+请给出足迹复盘（2-3句，含建议）：`
+
+    try {
+      const result = await callApi(
+        apiBaseUrl,
+        apiKey,
+        model,
+        [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: userPrompt }
+        ],
+        25_000
+      )
+      const insight = result.trim().slice(0, 400)
+      if (!insight) return { success: false, message: '模型返回为空' }
+      return { success: true, message: '生成成功', insight }
+    } catch (error) {
+      return { success: false, message: `生成失败：${(error as Error).message}` }
+    }
+  }
+
   // ── 私有方法 ────────────────────────────────────────────────────────────────
 
   private isEnabled(): boolean {
     return this.config.get('aiInsightEnabled') === true
+  }
+
+  private getSharedAiModelConfig(): SharedAiModelConfig {
+    const apiBaseUrl = String(
+      this.config.get('aiModelApiBaseUrl')
+      || this.config.get('aiInsightApiBaseUrl')
+      || ''
+    ).trim()
+    const apiKey = String(
+      this.config.get('aiModelApiKey')
+      || this.config.get('aiInsightApiKey')
+      || ''
+    ).trim()
+    const model = String(
+      this.config.get('aiModelApiModel')
+      || this.config.get('aiInsightApiModel')
+      || 'gpt-4o-mini'
+    ).trim() || 'gpt-4o-mini'
+
+    return { apiBaseUrl, apiKey, model }
   }
 
   /**
@@ -696,9 +814,7 @@ class InsightService {
     if (!sessionId) return
     if (!this.isEnabled()) return
 
-    const apiBaseUrl = this.config.get('aiInsightApiBaseUrl') as string
-    const apiKey = this.config.get('aiInsightApiKey') as string
-    const model = (this.config.get('aiInsightApiModel') as string) || 'gpt-4o-mini'
+    const { apiBaseUrl, apiKey, model } = this.getSharedAiModelConfig()
     const allowContext = this.config.get('aiInsightAllowContext') as boolean
     const contextCount = (this.config.get('aiInsightContextCount') as number) || 40
 

@@ -1635,6 +1635,22 @@ function registerIpcHandlers() {
     return insightService.triggerTest()
   })
 
+  ipcMain.handle('insight:generateFootprintInsight', async (_, payload: {
+    rangeLabel: string
+    summary: {
+      private_inbound_people?: number
+      private_replied_people?: number
+      private_outbound_people?: number
+      private_reply_rate?: number
+      mention_count?: number
+      mention_group_count?: number
+    }
+    privateSegments?: Array<{ displayName?: string; session_id?: string; incoming_count?: number; outgoing_count?: number; message_count?: number; replied?: boolean }>
+    mentionGroups?: Array<{ displayName?: string; session_id?: string; count?: number }>
+  }) => {
+    return insightService.generateFootprintInsight(payload)
+  })
+
   ipcMain.handle('config:clear', async () => {
     if (isLaunchAtStartupSupported() && getSystemLaunchAtStartup()) {
       const result = setSystemLaunchAtStartup(false)

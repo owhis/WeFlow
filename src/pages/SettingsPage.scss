@@ -177,6 +177,66 @@
       box-shadow: var(--shadow-sm);
     }
   }
+
+  .tab-group {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .tab-group-trigger {
+    position: relative;
+  }
+
+  .tab-group-arrow {
+    margin-left: auto;
+    color: var(--text-tertiary);
+    transition: transform 0.2s ease;
+
+    &.expanded {
+      transform: rotate(180deg);
+    }
+  }
+
+  .tab-sublist {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding-left: 8px;
+  }
+
+  .tab-sublist-wrap {
+    display: grid;
+    grid-template-rows: 0fr;
+    opacity: 0;
+    transition: grid-template-rows 0.22s ease, opacity 0.18s ease;
+
+    &.expanded {
+      grid-template-rows: 1fr;
+      opacity: 1;
+    }
+
+    &.collapsed {
+      pointer-events: none;
+    }
+  }
+
+  .tab-sublist {
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .tab-sub-btn {
+    padding-left: 24px;
+    font-size: 13px;
+  }
+
+  .tab-sub-dot {
+    width: 5px;
+    height: 5px;
+    border-radius: 999px;
+    background: color-mix(in srgb, var(--text-tertiary) 70%, transparent);
+  }
 }
 
 .settings-body {
@@ -197,6 +257,12 @@
     background: var(--border-color);
     border-radius: 3px;
   }
+}
+
+.ai-prompt-textarea {
+  font-family: inherit !important;
+  font-size: 14px !important;
+  line-height: 1.6;
 }
 
 .tab-content {

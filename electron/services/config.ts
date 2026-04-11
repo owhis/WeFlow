@@ -71,6 +71,9 @@ interface ConfigSchema {
   exportWriteLayout: 'A' | 'B' | 'C'
 
   // AI 见解
+  aiModelApiBaseUrl: string
+  aiModelApiKey: string
+  aiModelApiModel: string
   aiInsightEnabled: boolean
   aiInsightApiBaseUrl: string
   aiInsightApiKey: string
@@ -93,10 +96,21 @@ interface ConfigSchema {
   aiInsightTelegramToken: string
   /** Telegram 接收 Chat ID，逗号分隔，支持多个 */
   aiInsightTelegramChatIds: string
+
+  // AI 足迹
+  aiFootprintEnabled: boolean
+  aiFootprintSystemPrompt: string
 }
 
 // 需要 safeStorage 加密的字段（普通模式）
-const ENCRYPTED_STRING_KEYS: Set<string> = new Set(['decryptKey', 'imageAesKey', 'authPassword', 'httpApiToken', 'aiInsightApiKey'])
+const ENCRYPTED_STRING_KEYS: Set<string> = new Set([
+  'decryptKey',
+  'imageAesKey',
+  'authPassword',
+  'httpApiToken',
+  'aiModelApiKey',
+  'aiInsightApiKey'
+])
 const ENCRYPTED_BOOL_KEYS: Set<string> = new Set(['authEnabled', 'authUseHello'])
 const ENCRYPTED_NUMBER_KEYS: Set<string> = new Set(['imageXorKey'])
 
@@ -167,6 +181,9 @@ export class ConfigService {
       quoteLayout: 'quote-top',
       wordCloudExcludeWords: [],
       exportWriteLayout: 'A',
+      aiModelApiBaseUrl: '',
+      aiModelApiKey: '',
+      aiModelApiModel: 'gpt-4o-mini',
       aiInsightEnabled: false,
       aiInsightApiBaseUrl: '',
       aiInsightApiKey: '',
@@ -181,7 +198,9 @@ export class ConfigService {
       aiInsightSystemPrompt: '',
       aiInsightTelegramEnabled: false,
       aiInsightTelegramToken: '',
-      aiInsightTelegramChatIds: ''
+      aiInsightTelegramChatIds: '',
+      aiFootprintEnabled: false,
+      aiFootprintSystemPrompt: ''
     }
 
     const storeOptions: any = {
@@ -213,6 +232,7 @@ export class ConfigService {
       }
     }
     this.migrateAuthFields()
+    this.migrateAiConfig()
   }
 
   // === 状态查询 ===
@@ -714,6 +734,26 @@ export class ConfigService {
       if (changed) {
         this.store.set('wxidConfigs', wxidConfigs)
       }
+    }
+  }
+
+  private migrateAiConfig(): void {
+    const sharedBaseUrl = String(this.get('aiModelApiBaseUrl') || '').trim()
+    const sharedApiKey = String(this.get('aiModelApiKey') || '').trim()
+    const sharedModel = String(this.get('aiModelApiModel') || '').trim()
+
+    const legacyBaseUrl = String(this.get('aiInsightApiBaseUrl') || '').trim()
+    const legacyApiKey = String(this.get('aiInsightApiKey') || '').trim()
+    const legacyModel = String(this.get('aiInsightApiModel') || '').trim()
+
+    if (!sharedBaseUrl && legacyBaseUrl) {
+      this.set('aiModelApiBaseUrl', legacyBaseUrl)
+    }
+    if (!sharedApiKey && legacyApiKey) {
+      this.set('aiModelApiKey', legacyApiKey)
+    }
+    if (!sharedModel && legacyModel) {
+      this.set('aiModelApiModel', legacyModel)
     }
   }
 

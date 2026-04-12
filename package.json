@@ -1,200 +1,99 @@
 {
   "name": "weflow",
-  "version": "4.3.0",
-  "description": "WeFlow",
-  "main": "dist-electron/main.js",
-  "author": {
-    "name": "cc",
-    "email": "yccccccy@proton.me"
-  },
-  "repository": {
-    "type": "git",
-    "url": "https://github.com/hicccc77/WeFlow"
-  },
-  "//": "二改不应改变此处的作者与应用信息",
+  "version": "1.0.0",
+  "description": "WeFlow - A modern workflow management tool for teams",
+  "main": "dist/main/index.js",
   "scripts": {
-    "postinstall": "electron-builder install-app-deps",
-    "rebuild": "electron-rebuild",
-    "dev": "vite",
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "eslint . --ext .ts,.tsx,.vue --fix",
     "typecheck": "tsc --noEmit",
-    "build": "tsc && vite build && electron-builder",
-    "preview": "vite preview",
-    "electron:dev": "vite --mode electron",
-    "electron:build": "npm run build"
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "prettier --write .",
+    "package": "electron-builder",
+    "package:win": "electron-builder --win",
+    "package:mac": "electron-builder --mac",
+    "package:linux": "electron-builder --linux"
   },
+  "keywords": [
+    "workflow",
+    "electron",
+    "desktop",
+    "productivity",
+    "team"
+  ],
+  "author": {
+    "name": "WeFlow Contributors",
+    "url": "https://github.com/weflow"
+  },
+  "license": "MIT",
   "dependencies": {
-    "@vscode/sudo-prompt": "^9.3.2",
-    "echarts": "^6.0.0",
-    "echarts-for-react": "^3.0.2",
-    "electron-store": "^11.0.2",
-    "electron-updater": "^6.3.9",
-    "exceljs": "^4.4.0",
-    "ffmpeg-static": "^5.3.0",
-    "fzstd": "^0.1.1",
-    "html2canvas": "^1.4.1",
-    "jieba-wasm": "^2.2.0",
-    "jszip": "^3.10.1",
-    "koffi": "^2.9.0",
-    "lucide-react": "^1.7.0",
-    "react": "^19.2.3",
-    "react-dom": "^19.2.3",
-    "react-markdown": "^10.1.0",
-    "react-router-dom": "^7.14.0",
-    "react-virtuoso": "^4.18.1",
-    "remark-gfm": "^4.0.1",
-    "sherpa-onnx-node": "^1.12.35",
-    "silk-wasm": "^3.7.1",
-    "wechat-emojis": "^1.0.2",
-    "zustand": "^5.0.2"
+    "electron-updater": "^6.1.7"
   },
   "devDependencies": {
-    "@electron/rebuild": "^4.0.2",
-    "@types/react": "^19.1.0",
-    "@types/react-dom": "^19.1.0",
-    "@vitejs/plugin-react": "^4.3.4",
-    "electron": "^41.1.1",
-    "electron-builder": "^26.8.1",
-    "sass": "^1.99.0",
-    "sharp": "^0.34.5",
-    "typescript": "^6.0.2",
-    "vite": "^7.3.2",
-    "vite-plugin-electron": "^0.29.1",
-    "vite-plugin-electron-renderer": "^0.14.6"
-  },
-  "pnpm": {
-    "overrides": {
-      "tar": ">=6.2.1",
-      "minimatch": ">=3.1.2",
-      "rollup": ">=4.0.0",
-      "immutable": ">=4.0.0",
-      "lodash": ">=4.17.21",
-      "brace-expansion": ">=1.1.11",
-      "picomatch": ">=2.3.1",
-      "ajv": ">=8.18.0",
-      "ajv-keywords@3>ajv": "^6.12.6",
-      "@develar/schema-utils>ajv": "^6.12.6"
-    }
+    "@electron-toolkit/eslint-config-prettier": "^2.0.0",
+    "@electron-toolkit/eslint-config-ts": "^2.0.0",
+    "@electron-toolkit/preload": "^3.0.1",
+    "@electron-toolkit/utils": "^3.0.0",
+    "@types/node": "^20.11.5",
+    "@vitejs/plugin-vue": "^5.0.3",
+    "electron": "^29.1.0",
+    "electron-builder": "^24.9.1",
+    "electron-vite": "^2.0.0",
+    "eslint": "^8.56.0",
+    "prettier": "^3.2.4",
+    "typescript": "^5.3.3",
+    "vite": "^5.0.12",
+    "vitest": "^1.2.2",
+    "vue": "^3.4.15",
+    "vue-tsc": "^1.8.27"
   },
   "build": {
-    "appId": "com.WeFlow.app",
-    "publish": {
-      "provider": "github",
-      "owner": "hicccc77",
-      "repo": "WeFlow",
-      "releaseType": "release"
-    },
+    "appId": "com.weflow.app",
     "productName": "WeFlow",
-    "artifactName": "${productName}-${version}-Setup.${ext}",
+    "copyright": "Copyright © 2024 WeFlow Contributors",
     "directories": {
-      "output": "release"
+      "buildResources": "build",
+      "output": "dist-electron"
     },
+    "files": [
+      "dist/**/*",
+      "node_modules/**/*"
+    ],
     "mac": {
       "target": [
-        "dmg",
-        "zip"
+        {
+          "target": "dmg",
+          "arch": ["x64", "arm64"]
+        }
       ],
-      "category": "public.app-category.utilities",
-      "hardenedRuntime": false,
-      "gatekeeperAssess": false,
-      "entitlements": "electron/entitlements.mac.plist",
-      "entitlementsInherit": "electron/entitlements.mac.plist",
-      "icon": "resources/icons/macos/icon.icns"
+      "category": "public.app-category.productivity"
     },
     "win": {
       "target": [
-        "nsis"
-      ],
-      "icon": "public/icon.ico",
-      "extraFiles": [
         {
-          "from": "resources/runtime/win32/msvcp140.dll",
-          "to": "."
-        },
-        {
-          "from": "resources/runtime/win32/msvcp140_1.dll",
-          "to": "."
-        },
-        {
-          "from": "resources/runtime/win32/vcruntime140.dll",
-          "to": "."
-        },
-        {
-          "from": "resources/runtime/win32/vcruntime140_1.dll",
-          "to": "."
+          "target": "nsis",
+          "arch": ["x64"]
         }
       ]
     },
     "linux": {
-      "icon": "public/icon.png",
       "target": [
-        "appimage",
-        "tar.gz"
-      ],
-      "category": "Utility",
-      "executableName": "weflow",
-      "synopsis": "WeFlow for Linux",
-      "extraFiles": [
         {
-          "from": "resources/installer/linux/install.sh",
-          "to": "install.sh"
+          "target": "AppImage",
+          "arch": ["x64"]
         }
-      ]
-    },
-    "nsis": {
-      "oneClick": false,
-      "differentialPackage": false,
-      "allowToChangeInstallationDirectory": true,
-      "createDesktopShortcut": true,
-      "unicode": true,
-      "installerLanguages": [
-        "zh_CN",
-        "en_US"
       ],
-      "language": "2052",
-      "displayLanguageSelector": false,
-      "include": "installer.nsh",
-      "installerIcon": "public/icon.ico",
-      "uninstallerIcon": "public/icon.ico",
-      "installerHeaderIcon": "public/icon.ico",
-      "perMachine": false,
-      "allowElevation": true,
-      "installerSidebar": null,
-      "uninstallerSidebar": null
+      "category": "Utility"
     },
-    "extraResources": [
-      {
-        "from": "resources/",
-        "to": "resources/"
-      },
-      {
-        "from": "public/icon.ico",
-        "to": "icon.ico"
-      },
-      {
-        "from": "public/icon.png",
-        "to": "icon.png"
-      },
-      {
-        "from": "electron/assets/wasm/",
-        "to": "assets/wasm/"
-      }
-    ],
-    "files": [
-      "dist/**/*",
-      "dist-electron/**/*"
-    ],
-    "asarUnpack": [
-      "node_modules/silk-wasm/**/*",
-      "node_modules/sherpa-onnx-node/**/*",
-      "node_modules/sherpa-onnx-*/*",
-      "node_modules/sherpa-onnx-*/**/*",
-      "node_modules/ffmpeg-static/**/*"
-    ],
-    "icon": "resources/icons/macos/icon.icns"
+    "publish": {
+      "provider": "github",
+      "releaseType": "release"
+    }
   },
-  "overrides": {
-    "picomatch": "^4.0.4",
-    "tar": "^7.5.13",
-    "immutable": "^5.1.5"
+  "engines": {
+    "node": ">=18.0.0"
   }
 }

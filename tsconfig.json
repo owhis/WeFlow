@@ -36,6 +36,8 @@
     "noImplicitReturns": true,
     /* Disabled exactOptionalPropertyTypes for now - too strict for personal experimentation */
     "exactOptionalPropertyTypes": false,
+    /* Helpful for catching missing properties during personal experimentation */
+    "noPropertyAccessFromIndexSignature": true,
 
     /* Completeness */
     "skipLibCheck": true

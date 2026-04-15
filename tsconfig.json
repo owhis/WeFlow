@@ -40,6 +40,8 @@
     "noPropertyAccessFromIndexSignature": true,
     /* Ensure consistent use of type-only imports - helps keep bundle clean */
     "verbatimModuleSyntax": false,
+    /* Enabling this to catch accidental use of 'any' during learning - helps me understand types better */
+    "noImplicitAny": true,
 
     /* Completeness */
     "skipLibCheck": true

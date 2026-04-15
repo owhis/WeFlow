@@ -34,7 +34,8 @@
     "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
     "noImplicitReturns": true,
-    "exactOptionalPropertyTypes": true,
+    /* Disabled exactOptionalPropertyTypes for now - too strict for personal experimentation */
+    "exactOptionalPropertyTypes": false,
 
     /* Completeness */
     "skipLibCheck": true

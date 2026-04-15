@@ -42,6 +42,8 @@
     "verbatimModuleSyntax": false,
     /* Enabling this to catch accidental use of 'any' during learning - helps me understand types better */
     "noImplicitAny": true,
+    /* Disallow implicit override - good practice when extending classes during learning */
+    "noImplicitOverride": true,
 
     /* Completeness */
     "skipLibCheck": true

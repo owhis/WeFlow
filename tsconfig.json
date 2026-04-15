@@ -38,6 +38,8 @@
     "exactOptionalPropertyTypes": false,
     /* Helpful for catching missing properties during personal experimentation */
     "noPropertyAccessFromIndexSignature": true,
+    /* Ensure consistent use of type-only imports - helps keep bundle clean */
+    "verbatimModuleSyntax": false,
 
     /* Completeness */
     "skipLibCheck": true

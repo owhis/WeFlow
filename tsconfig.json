@@ -44,6 +44,8 @@
     "noImplicitAny": true,
     /* Disallow implicit override - good practice when extending classes during learning */
     "noImplicitOverride": true,
+    /* Turning on checkJs to get type feedback in JS files too - useful while learning */
+    "checkJs": true,
 
     /* Completeness */
     "skipLibCheck": true

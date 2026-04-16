@@ -16,7 +16,7 @@
 
     /* JavaScript Support */
     "allowJs": true,
-    "checkJs": false,
+    /* checkJs enabled below in Type Checking section */
 
     /* Emit */
     "noEmit": true,
@@ -54,6 +54,7 @@
     "src/**/*.ts",
     "src/**/*.tsx",
     "src/**/*.d.ts",
+    "src/**/*.js",
     "electron/**/*.ts",
     "vite.config.ts"
   ],

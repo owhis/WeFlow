@@ -46,6 +46,8 @@
     "noImplicitOverride": true,
     /* Turning on checkJs to get type feedback in JS files too - useful while learning */
     "checkJs": true,
+    /* Turning on to catch unread local variables more aggressively - personal preference */
+    "allowUnreachableCode": false,
 
     /* Completeness */
     "skipLibCheck": true
